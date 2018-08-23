@@ -1,0 +1,24 @@
+#ifndef RANGED_H
+#define RANGED_H
+#include "character.h"
+
+//------------------------------------------------------------------------------
+class Ranged: public Character
+{
+ public: bool Attack(Character*);  
+         void Att_End(){};   
+      };  
+//------------------------------------------------------------------------------
+class Arrow: public Game_Object
+{
+      public: Arrow(float,float);
+              ~Arrow();
+              void Step();
+              float xspeed, yspeed;
+              Ranged* shooter;
+              int delay;
+              int dmg;
+              
+      };
+//------------------------------------------------------------------------------
+#endif
