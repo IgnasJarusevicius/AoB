@@ -1,5 +1,6 @@
 #include "gres.h"
 #include <stdio.h>
+#include <stdint.h>
 
 SpriteSet* Graphic_Resources::spritesets[SPRITESETS];
 GLuint Graphic_Resources::textures[TEXTURES];
@@ -9,7 +10,7 @@ Sprite* Graphic_Resources::sprites[SPRITES];
 GLuint Graphic_Resources::LoadTexture(const char * filename)
 {
     GLuint texture;
-    int width, height, size;
+    uint32_t width, height, size;
     unsigned char * data;
     FILE * file;
     
@@ -17,8 +18,8 @@ GLuint Graphic_Resources::LoadTexture(const char * filename)
     if ( file == NULL ) return 0;
     
     fseek(file,18,SEEK_SET);
-    fread(&width, sizeof(int),1,file);
-    fread(&height, sizeof(int),1,file);
+    fread(&width, sizeof(width),1,file);
+    fread(&height, sizeof(height),1,file);
     size = width * height * 3; 
     fseek(file,28,SEEK_CUR);
     data = new unsigned char[size];

@@ -1,3 +1,6 @@
+#build idrectory
+build/**
+
 # Prerequisites
 *.d
 

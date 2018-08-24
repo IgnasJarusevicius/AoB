@@ -8,7 +8,7 @@ typedef unsigned char Byte;
 //------------------------------------------------------------------------------
 Sprite::Sprite(const char* name, int cnt, int xof, int yof)
 { 
- char ch[32];  
+ char ch[1024];  
  int width, height;                                    
  images = new GLuint[cnt];                 
  for (int i(0); i<cnt; i++)

@@ -314,7 +314,7 @@ void Game_Start::Unlock_Info(int ind)
   case 10: a = 5 ; b = 1 ; break;
   default: return;
   }              
- char* str = new char[18]; 
+ char* str = new char[20]; 
  glColor3f(0.5f,1.0f,0.2f); 
  glRasterPos3f(240,240,0);
  glutBitmapString(GLUT_BITMAP_9_BY_15,(const unsigned char*)"LOCKED"); 
@@ -415,12 +415,12 @@ void How_To::Display()
  glTexCoord2d(0.0f,0.0f);glVertex3f(22.0f,28.0f,0.0f);
  glTexCoord2d(1.0f,0.0f);glVertex3f(150.0f,28.0f,0.0f);
  glColor3f(1.0f,1.0f,1.0f);  
- glTexCoord2d(1.0f,0.8f);glVertex3f(692.0f,694.0f,0.0f);
- glTexCoord2d(0.0f,0.8f);glVertex3f(400.0f,694.0f,0.0f);
- glTexCoord2d(0.0f,0.6f);glVertex3f(400.0f,630.0f,0.0f);
- glTexCoord2d(1.0f,0.6f);glVertex3f(692.0f,630.0f,0.0f);
+ glTexCoord2d(1.0f,0.8f);glVertex3f(622.0f,694.0f,0.0f);
+ glTexCoord2d(0.0f,0.8f);glVertex3f(430.0f,694.0f,0.0f);
+ glTexCoord2d(0.0f,0.6f);glVertex3f(430.0f,630.0f,0.0f);
+ glTexCoord2d(1.0f,0.6f);glVertex3f(622.0f,630.0f,0.0f);
  glEnd();  
- 
+ glDisable( GL_TEXTURE_2D );
  glColor3f(0.1f,0.8f,0.8f);     
  glRasterPos3f(360.0f,550.0f,0.0f);
  glutBitmapString(GLUT_BITMAP_HELVETICA_18,(const unsigned char*)"Mouse Left Button");
@@ -467,10 +467,10 @@ void Credits::Display()
  glTexCoord2d(0.0f,0.0f);glVertex3f(22.0f,28.0f,0.0f);
  glTexCoord2d(1.0f,0.0f);glVertex3f(150.0f,28.0f,0.0f);
  glColor3f(1.0f,1.0f,1.0f);  
- glTexCoord2d(1.0f,0.6f);glVertex3f(692.0f,694.0f,0.0f);
- glTexCoord2d(0.0f,0.6f);glVertex3f(400.0f,694.0f,0.0f);
- glTexCoord2d(0.0f,0.4f);glVertex3f(400.0f,630.0f,0.0f);
- glTexCoord2d(1.0f,0.4f);glVertex3f(692.0f,630.0f,0.0f);
+ glTexCoord2d(1.0f,0.6f);glVertex3f(622.0f,694.0f,0.0f);
+ glTexCoord2d(0.0f,0.6f);glVertex3f(430.0f,694.0f,0.0f);
+ glTexCoord2d(0.0f,0.4f);glVertex3f(430.0f,630.0f,0.0f);
+ glTexCoord2d(1.0f,0.4f);glVertex3f(622.0f,630.0f,0.0f);
  glEnd();                
  } 
 

@@ -1,8 +1,7 @@
 //------------------------------------------------------------------------------
-#include <al/al.h>
-#include <al/alc.h>
 #include "audio.h"
 #include <stdio.h>
+#include <stdint.h>
 //------------------------------------------------------------------------------
 ALuint Audio::Buffers[BUFFERS];
 ALuint Audio::sources[SOURCES];
@@ -21,7 +20,6 @@ ALboolean Audio::Init()
  if(alcGetError(pDevice) != ALC_NO_ERROR)
  return AL_FALSE;
  alGetError(); 
- 
  LoadAudio();
  CreateSources();
  return AL_TRUE;
@@ -123,12 +121,12 @@ ALboolean Audio::Source(int ind, int buff,float pitch, float gain, ALboolean loo
 ALboolean Audio::LoadBuffer(char* fileName, int ind) {
      
     unsigned char *data;
-    long freq;
-    long size;
-    short format;
+    uint32_t freq;
+    uint32_t size;
+    uint16_t format;
     FILE* file;
-    short channels;
-    short samplebits;	
+    uint16_t channels;
+    uint16_t samplebits;	
     file = fopen(fileName, "rb");
     if (file == NULL) return AL_FALSE;
     fseek(file,22,SEEK_SET);
