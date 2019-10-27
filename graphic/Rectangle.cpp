@@ -44,9 +44,8 @@ void Rectangle::LoadResources()
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, &data);
 }
 
-void Rectangle::Render()
+void Rectangle::Render() const
 {
-    // bind Texture
     glBindTexture(GL_TEXTURE_2D, texture);
     glDrawArrays(GL_TRIANGLES, 0, 6);
 }
@@ -57,7 +56,7 @@ RectangleOutline::RectangleOutline(float x, float y, float w, float h, float z):
 
 }
 
-void RectangleOutline::Render()
+void RectangleOutline::Render() const
 {
     glBindTexture(GL_TEXTURE_2D, texture);
     glDrawArrays(GL_LINE_STRIP, 0, 5);

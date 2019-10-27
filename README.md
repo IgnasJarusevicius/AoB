@@ -1,7 +1,7 @@
 # AoB
 
-A bit more recent version using Core OpenGL profile (shaders) instead of fixed function pipeline
-Original 2D Game university project version is in 'old_version' branch
+Old 2D game project archives converted to Git.
+This branch contains the latest experimental version with different view and mechanics
 
 Graphics assets taken from [Reiner's Tilesets](https://www.reinerstilesets.de/)
 

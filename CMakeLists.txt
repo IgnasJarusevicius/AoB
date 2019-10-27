@@ -12,14 +12,9 @@ endif()
 ########################################################################
 
 #C++11 is a required language feature for this project
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 14)
 
 if(CMAKE_COMPILER_IS_GNUCXX)
-
-    #enable C++11 on older versions of cmake
-    if (CMAKE_VERSION VERSION_LESS "3.1")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
-    endif()
 
     #enable warnings in Debug configurations
     if (NOT CMAKE_BUILD_TYPE STREQUAL "Release")
@@ -41,26 +36,26 @@ endif(MSVC)
 
 
 set(GAME_SOURCES
-    ai.cpp
     glad/glad.cpp
     audio.cpp
-    controller.cpp
     object/GameObject.cpp
-    Battle.cpp
     main.cpp
-    mouse.cpp
     graphic/texture.cpp
     graphic/GraphicObject.cpp
-    stats.cpp
+    object/stats.cpp
     graphic/TextObj.cpp
     graphic/Picture.cpp
     graphic/Rectangle.cpp
+    object/menu.cpp
     object/bobject.cpp
     object/character.cpp
     object/damage.cpp
-    object/list.cpp
     object/object.cpp
     object/ranged.cpp
+    object/BattleGrid.cpp
+    object/grid.cpp
+    object/ProgressBar.cpp
+    object/AttackType.cpp
     graphic/gres.cpp
     graphic/sprite.cpp
 )
@@ -74,11 +69,12 @@ set(GAME_INCLUDES
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/graphic
     ${CMAKE_CURRENT_SOURCE_DIR}/object
-    ${OPENAL_INCLUDE_DIR}
+    ${OPENAL_INCLUDE_DIR}DE_DIR}
 )
 
 target_include_directories(game PUBLIC ${GAME_INCLUDES})
 target_link_libraries(game
+                     ${GLUT_LIBRARY}
                      ${OPENGL_LIBRARIES}
                      openal
                      glfw

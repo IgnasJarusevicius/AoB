@@ -1,30 +1,52 @@
-#include "mouse.h"
-#include "audio.h"
-#include "Battle.h"
-#include "graphic/gres.h"
 #include "TextObj.h"
 #include <GLFW/glfw3.h>
 #include <chrono>
 #include <iostream>
+#include <unordered_map>
+#include "audio.h"
+#include "graphic/gres.h"
+#include "object/BattleGrid.h"
+#include "menu.h"
+#include "GameState.h"
+
+
+// Create an unordered_map of three strings (that map to strings)
+static std::unordered_map<int, int> keyMap = {
+    {GLFW_KEY_ESCAPE, KeyboardAction::KEY_ESC},
+    {GLFW_KEY_SPACE, KeyboardAction::KEY_SPACE},
+};
+//#define PRINT_FPS
 
 static const int initialWidth = 1024;
 static const int initialHeight = 768;
 
 static int windowWidth = initialWidth;
 static int windowHeight = initialHeight;
+static float game_speed = 1.0f;
 
-void processInput(GLFWwindow *window)
+GameState* gameState = nullptr;
+Menu* menu = nullptr;
+BattleGrid* battle = nullptr;
+GLFWwindow* window;
+
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-        glfwSetWindowShouldClose(window, true);
+    if (key == GLFW_KEY_KP_ADD && action == GLFW_RELEASE)
+        game_speed *= game_speed < 4.0f ? 1.5f : 1.0f;
+    else if (key == GLFW_KEY_KP_SUBTRACT && action == GLFW_RELEASE)
+        game_speed /= game_speed > 0.2f ? 1.5f : 1.0f;
+    else if (action == GLFW_RELEASE)
+        gameState->HandleKey(keyMap[key]);
 }
 
 // -------------------------------------------------------
+float mouse_x;
+float mouse_y;
 void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 {
-    xpos = xpos * initialWidth / windowWidth;
-    ypos = initialHeight - ypos * initialHeight /windowHeight;
-    Mouse::SetPos(xpos, ypos);
+    mouse_x = xpos * initialWidth / windowWidth;
+    mouse_y = initialHeight - ypos * initialHeight /windowHeight;
+    gameState->HandleMouse(mouse_x, mouse_y, MouseAction::NONE);
 }
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
@@ -36,23 +58,43 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 
 void mouse_button_cb(GLFWwindow* window, int button, int action, int modkeys)
 {
-    if (button == GLFW_MOUSE_BUTTON_LEFT)
-        Mouse::SetBut(action == GLFW_PRESS ? Mouse::LEFT_DOWN : Mouse::LEFT_UP);
-    if (button == GLFW_MOUSE_BUTTON_RIGHT)
-        Mouse::SetBut(action == GLFW_PRESS ? Mouse::RIGHT_DOWN : Mouse::RIGHT_UP);
-    if (button == GLFW_MOUSE_BUTTON_MIDDLE)
-        Mouse::SetBut(action == GLFW_PRESS ? Mouse::MIDDLE_DOWN : Mouse::MIDDLE_UP);
+    if (action==GLFW_RELEASE)
+    {
+        if (button == GLFW_MOUSE_BUTTON_LEFT)
+            gameState->HandleMouse(mouse_x, mouse_y, MouseAction::LEFT_UP);
+        else if (button == GLFW_MOUSE_BUTTON_RIGHT)
+            gameState->HandleMouse(mouse_x, mouse_y, MouseAction::RIGHT_UP);
+    }
+ /*   if (button == GLFW_MOUSE_BUTTON_MIDDLE)
+        Mouse::SetBut(action == GLFW_PRESS ? BattleGrid::MIDDLE_DOWN : BattleGrid::MIDDLE_UP);*/
+}
+
+void GameEventHandler(GameState::Event evt)
+{
+    switch (evt)
+    {
+        case GameState::exitGame:
+            glfwSetWindowShouldClose(window, true);
+            break;
+        case GameState::newGame:
+            if (battle)
+                delete battle;
+            gameState = battle = new BattleGrid();
+            menu->Enable(false);
+            break;
+        default:
+            return;
+    }
 }
 
 int main(int argc, char** argv)
 {
-    Controller* game;
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    GLFWwindow* window = glfwCreateWindow(windowWidth, windowHeight, "Game", NULL, NULL);
+    window = glfwCreateWindow(windowWidth, windowHeight, "Game", NULL, NULL);
     if (window == NULL)
     {
         std::cout << "Failed to create GLFW window" << std::endl;
@@ -64,6 +106,7 @@ int main(int argc, char** argv)
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetMouseButtonCallback(window, mouse_button_cb);
+    glfwSetKeyCallback(window, key_callback);
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
@@ -86,84 +129,36 @@ int main(int argc, char** argv)
         glfwSwapBuffers(window);
         Graphic_Resources::Load_Graphics();
         Audio::Init();
-        Mouse::Reset();
         stateInfo.Enable(false);
     }
-    game = new Menu();
-
+    gameState = menu = new Menu();
     auto t1 = std::chrono::high_resolution_clock::now();
-    int frame_counter = 0;
+    float frame_counter = 0.0f;
+    float timePeriod = 0.0f;
     while (!glfwWindowShouldClose(window))
     {
-        processInput(window);
-        if (game)
-        {
-            int ret = game->Update();
-            if (ret != 0)
-            {
-                if (ret == menuExit)
-                {
-                    break;
-                }
-                else if (ret == menuNew)
-                {
-                    delete game;
-                    game = new Game_Start();
-                }
-                else if (ret == menuResume)
-                {
-                    delete game;
-                    game = new Game_Start();
-                }
-                else if (ret == battleStart)
-                {
-                    delete game;
-                    game = new Battle();
-                }
-                else if (ret == gameOver)
-                {
-                    delete game;
-                    game = new Menu();
-                }
-                else if (ret == selectStart || ret == battleCont)
-                {
-                    delete game;
-                    game = new Level();
-                }
-                else if (ret == selectBack)
-                {
-                    delete game;
-                    game = new Menu();
-                }
-                else if (ret == battleRecruit)
-                {
-                    delete game;
-                    game = new Game_Start(0);
-                }
-                else if (ret == battleOver)
-                {
-                    delete game;
-                    game = new Game_Over();
-                }
-            }
-        }
-        Mouse::Reset();
+        auto t2 = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<float> dt = t2-t1;
+        t1 = t2;
+        auto evt = gameState->Step(dt.count()*game_speed < 0.1f ? dt.count()*game_speed : 0.1f);
+        GameEventHandler(evt);
         GraphicObject::RenderAll();
         glfwSwapBuffers(window);
         glfwPollEvents();
 
+#ifdef PRINT_FPS
         frame_counter++;
-        auto t2 = std::chrono::high_resolution_clock::now();
-        auto timePeriod = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
-        if (timePeriod >= 1000)
+        timePeriod += dt.count();
+        if (timePeriod >= 1.0f)
         {
-            t1 = t2;
-            float fps = 1000.0f*frame_counter/ timePeriod;
+            float fps = frame_counter/ timePeriod;
             printf("FPS: %.1f\n", fps);
-            frame_counter = 0;
+            frame_counter = 0.0f;
+            timePeriod = 0.0f;
         }
+#endif
     }
-    delete game;
+    delete gameState;
     glfwTerminate();
     Audio::Unload();
     return 0;

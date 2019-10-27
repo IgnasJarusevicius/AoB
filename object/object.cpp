@@ -1,51 +1,99 @@
 #include "object.h"
-#include "graphic/gres.h"
-//------------------------------------------------------------------------------
 
-const UnitStats SkelArch =    { 40, 13,  6,  0, 85, 5,  6, PLAY_BOW, PLAY_STEP, PLAY_DIE2, 16.0f, Graphic_Resources::skelarc_sprites};
-const UnitStats Hunter =      { 40,  7,  7,  0,  0, 6,  7, PLAY_BOW, PLAY_STEP2, PLAY_DIE, 16.0f, Graphic_Resources::hunter_sprites};
-const UnitStats Orc =         { 60,  8,  4, 10,  0, 7, 10, PLAY_ATT, PLAY_STEP2, PLAY_DIE, 16.0f, Graphic_Resources::orc_sprites};
-const UnitStats SkelWar =     { 50, 16,  4, 20, 85, 6,  8, PLAY_SWORD, PLAY_STEP2, PLAY_DIE2, 16.0f, Graphic_Resources::skelarc_sprites};
-const UnitStats Pirate =      { 50, 11,  2,  0,  0, 8, 12, PLAY_ATT, PLAY_STEP4, PLAY_DIE, 16.0f, Graphic_Resources::pirate_sprites};
-const UnitStats Barbarian =   { 80, 17,  8,  0,  0, 8, 11, PLAY_AXE, PLAY_STEP4, PLAY_DIE, 16.0f, Graphic_Resources::barbar_sprites};
-const UnitStats Viking =      {100, 23,  6, 50, 25, 7,  9, PLAY_SWORD, PLAY_STEP3, PLAY_DIE, 16.0f, Graphic_Resources::viking_sprites};
-const UnitStats Lava =        {150, 20, 10, 10, 40, 6,  8, PLAY_WHIP, PLAY_STEP2, PLAY_DIE2, 16.0f, Graphic_Resources::lava_sprites};
-const UnitStats Archer =      { 70, 25,  5, 10, 20, 6,  8, PLAY_BOW, PLAY_STEP2, PLAY_DIE, 16.0f, Graphic_Resources::archer_sprites};
-const UnitStats Knight =      { 90, 24,  3, 70, 70, 6,  8, PLAY_SWORD, PLAY_STEP2, PLAY_DIE, 16.0f, Graphic_Resources::knight_sprites};
-const UnitStats Dwarf =       {120, 28, 14, 30, 60, 7, 10, PLAY_AXE, PLAY_STEP3, PLAY_DIE, 16.0f, Graphic_Resources::dwarf_sprites};
-
-const UnitStats unit_data[UNIT_CNT] =
+Orc::Orc(int p): Character(StatsOrc, p)
 {
-    Orc,
-    Pirate,
-    Hunter,
-    Barbarian,
-    SkelWar,
-    SkelArch,
-    Viking,
-    Lava,
-    Archer,
-    Knight,
-    Dwarf
-};
+}
 
-//------------------------------------------------------------------------------
-Tree::Tree(float set_x, float set_y) : Game_Object(set_x, set_y, 16.0f - set_y)
+Pirate::Pirate(int p): Character(StatsPirate, p)
 {
-    radius = 12.0f;
-    player = 0;
-    sprite = Graphic_Resources::sprites[TREE1];
-    image = new Picture(x, y, -y, sprite->images[0]);
+}
+
+Barbarian::Barbarian(int p): Character(StatsBarbarian, p)
+{
+}
+
+SkelWar::SkelWar(int p): Character(StatsSkelWar, p)
+{
+}
+
+Viking::Viking(int p): Character(StatsViking, p)
+{
+}
+
+Lava::Lava(int p): Character(StatsLava, p)
+{
+}
+
+Knight::Knight(int p): Character(StatsKnight, p)
+{
+}
+
+Dwarf::Dwarf(int p): Character(StatsDwarf, p)
+{
+}
+
+Hunter::Hunter(int p): Ranged(StatsHunter, p)
+{
+}
+
+SkelArch::SkelArch(int p): Ranged(StatsSkelArch, p)
+{
+    att_types.push_back(new PreciseShot(stats));
+}
+
+Archer::Archer(int p): Ranged(StatsArcher, p)
+{
+    att_types.push_back(new PreciseShot(stats));
+    att_types.push_back(new CripplingShot(stats));
 }
 
 //------------------------------------------------------------------------------
-Rock::Rock(float set_x, float set_y) : Game_Object(set_x, set_y, -set_y)
+
+
+Obstacle::Obstacle(int grid_x, int grid_y, Grid* grid, unsigned tex, int x0, int y0, int size) :
+    GridObject(grid_x, grid_y, grid, size),
+    image(x-x0, y-y0, -y, tex)
 {
-    radius = 24;
-    player = 0;
-    sprite = Graphic_Resources::sprites[ROCK1];
-    image = new Picture(x, y, -y, sprite->images[0]);
+}
+
+bool Obstacle::IsDestructable() const
+{
+    return false;
+}
+
+void Obstacle::Enable(bool en)
+{
+    image.Enable(en);
+}
+
+Tree::Tree(int grid_x, int grid_y, Grid* grid) :
+    Obstacle(grid_x, grid_y, grid,Graphic_Resources::textures[TREE1], 64, 32, 1)
+{
+}
+
+float Tree::GetSize() const
+{
+    return 20.0f;
+}
+
+
+//------------------------------------------------------------------------------
+Rock::Rock(int grid_x, int grid_y, Grid* grid) :
+    Obstacle(grid_x, grid_y, grid,Graphic_Resources::textures[ROCK1], 33, 28, 1)
+{
 }
 //------------------------------------------------------------------------------
+float Rock::GetSize() const
+{
+    return 40.0f;
+}
 
-
+Rock2::Rock2(int grid_x, int grid_y, Grid* grid) :
+    Obstacle(grid_x, grid_y, grid,Graphic_Resources::textures[ROCK2], 48, 40, 2)
+{
+}
+//------------------------------------------------------------------------------
+float Rock2::GetSize() const
+{
+    return 80.0f;
+}

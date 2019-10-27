@@ -1,6 +1,7 @@
 #include "GraphicObject.h"
 #include "Shader.h"
 #include <glm/gtc/matrix_transform.hpp>
+#include <cstring>
 
 static const char *vertexShaderSource =
 "#version 330 core\n\
@@ -40,11 +41,21 @@ GraphicObject::GraphicObject() : enabled(true)
     scalex = scaley = 1.0f;
 }
 
+GraphicObject::GraphicObject(GraphicObject&& obj)
+{
+    std::memcpy(this, &obj, sizeof(GraphicObject));
+    obj.vao = std::numeric_limits<unsigned int>::max();
+    obj.vbo = std::numeric_limits<unsigned int>::max();
+    objList.push_front(this);
+}
+
 GraphicObject::~GraphicObject()
 {
     objList.remove(this);
-    glDeleteVertexArrays(1, &vao);
-    glDeleteBuffers(1, &vbo);
+    if (vao != std::numeric_limits<unsigned int>::max())
+        glDeleteVertexArrays(1, &vao);
+    if (vbo != std::numeric_limits<unsigned int>::max())
+        glDeleteBuffers(1, &vbo);
 }
 
 void GraphicObject::UpdateTransform()

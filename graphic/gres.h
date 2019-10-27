@@ -1,24 +1,43 @@
 #ifndef GRES_H
 #define GRES_H
-#include "sprite.h"
+#include <glad/glad.h>
+enum
+{
+    NOTEXTURE = 0,
+    GRASS,
+    STONE,
+    MENU,
+    OKBUTTON,
+    TITLE,
+    ROCK1,
+    ROCK2,
+    TREE1,
+    TEXTURES_CNT
+};
 
-#define TEXTURES 5
-#define GRASS 0
-#define STONE 1
-#define MENU 2
-#define OKBUTTON 3
-#define TITLE 4
 
-#define SPRITES 3
-#define ARROW 0
-#define ROCK1 1
-#define TREE1 2
-
+class Sprite;
 typedef Sprite* SpriteSet[4][8];
+
+struct Tile
+{
+    Tile(){};
+    Tile(GLuint t, float x0 = 0.0f, float x1 = 1.0f, float y0 = 0.0f, float y1 = 1.0f);
+    Tile(GLuint t, float x0, float x1, float y0 , float y1, int w, int h);
+    GLuint tex;
+    float u0;
+    float u1;
+    float v0;
+    float v1;
+    int width;
+    int height;
+};
+
+
 
 class Graphic_Resources
 {
- public:
+public:
     static SpriteSet orc_sprites;
     static SpriteSet pirate_sprites;
     static SpriteSet hunter_sprites;
@@ -30,8 +49,8 @@ class Graphic_Resources
     static SpriteSet lava_sprites;
     static SpriteSet knight_sprites;
     static SpriteSet dwarf_sprites;
-    static Sprite* sprites[SPRITES]; 
-    static GLuint textures[TEXTURES];        
+    static Sprite* arrow; 
+    static GLuint textures[TEXTURES_CNT];        
     static void Load_Graphics();      
 private: 
     static void Load_Textures();

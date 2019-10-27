@@ -1,380 +1,409 @@
 #include "character.h"
-#include "Battle.h"
 #include <cstdlib>
 #include <cmath>
+#include <vector>
 #include "stats.h"
 #include "object.h"
+#include "damage.h"
+#include <iostream>
+#include <cstring>
 
-Character::Character(float xx, float yy, const UnitStats& stats) : Game_Object(xx, yy, -yy)
+Character::Character(const UnitResources& res, int p) :
+    Unit(p),
+    base_stats(res.stats),
+    stats(base_stats),
+    direction(p == 2 ? 4 : 0),
+    sounds{res.sound_att, res.sound_step, res.sound_die},
+    target(nullptr),
+    speed(res.speed),
+    state(STAND),
+    spriteset(res.spriteset),
+    hp_bar(0.0f, 0.0f, Grid::slotSize-6, 6),
+    speed_x {1.0f*speed, 0.7071f*speed, 0.0f, -0.7071f*speed, -1.0f*speed, -0.7071f*speed, 0.0f, 0.7071f*speed},
+    speed_y {0.0f, 0.7071f*speed, 1.0f*speed, 0.7071f*speed, 0.0f, -0.7071f * speed, -1.0f*speed, -0.7071f * speed},
+    z(-y)
 {
-    ranged = false;
-    direction = 0;
-    state = 0;
-    hp = maxhp = stats.hp;
-    dmg = stats.dmg_base;
-    dmg2 = stats.dmg_var;
-    def = stats.def_melee;
-    def2 = stats.def_ranged;
-    speed = stats.speed;
-    radius = stats.radius;
-    movement = maxmove = stats.movement;
-    spriteset = stats.spriteset;
     image = new Picture(x, y, -y, spriteset[0][0]->images[0]);
-    sounds[0] = stats.sound_att;
-    sounds[1] = stats.sound_step;
-    sounds[2] = stats.sound_die;
-    att = true;
+    att_types.push_back(new NormalAttack(stats));
+    attack = att_types[0];
 }
-
 //------------------------------------------------------------------------------
 
 Character::~Character()
 {
+    for (auto& i : att_types)
+        delete i;
 }
-
 //------------------------------------------------------------------------------
 
-void Character::Move(int xx, int yy)
+std::pair<int, int> Character::Move(int grid_x, int grid_y)
 {
-    int i;
-    Battle::active_control = false;
-    Battle::grid[xx][yy] = this;
-    movement -= movement + 1 - Battle::action_zone[xx][yy];
+    auto grid_pos = grid->GridPos({x, y});
+    if (state != STAND || moveZone[grid_x][grid_y] < 0)
+        return grid_pos;
+    path.clear();
+    GetPath(grid_x, grid_y);
+    if (path.size() < 2)
+        return grid_pos;
 
-    while (1)
+    grid_pos = grid->GridPos(path[0]);
+
+    stats.ap -= moveZone[grid_pos.first][grid_pos.second];
+
+    x = path.back().real();
+    y = path.back().imag();
+    path.pop_back();
+
+    SetDirection(path.back());
+    image_speed = 15.0f;
+    state = MOVE;
+    Audio::Play(sounds[1]);
+    return grid_pos;
+}
+
+void Character::UpdateMoveRange()
+{
+    for (auto& i : moveZone)
+        i = 0x7FFF;
+    for (const auto& unit : grid->GetUnits())
     {
-        path.Add(GRID_X + xx * SLOT + SLOT / 2, GRID_Y + yy * SLOT + SLOT / 2);
-        i = Battle::action_zone[xx][yy];
-        if ((xx > 0)&&(yy > 0)&&(Battle::action_zone[xx - 1][yy - 1] == i + 3))
-        {
-            xx--;
-            yy--;
-            path.first->dir = 1;
-            continue;
-        }
-        if ((xx > 0)&&(yy < V_SLOT_NUMBER - 1)&&(Battle::action_zone[xx - 1][yy + 1] == i + 3))
-        {
-            xx--;
-            yy++;
-            path.first->dir = 7;
-            continue;
-        }
-        if ((xx < H_SLOT_NUMBER - 1)&&(yy > 0)&&(Battle::action_zone[xx + 1][yy - 1] == i + 3))
-        {
-            xx++;
-            yy--;
-            path.first->dir = 3;
-            continue;
-        }
-        if ((xx < H_SLOT_NUMBER - 1)&&(yy < V_SLOT_NUMBER - 1)&&(Battle::action_zone[xx + 1][yy + 1] == i + 3))
-        {
-            xx++;
-            yy++;
-            path.first->dir = 5;
-            continue;
-        }
-        if ((xx > 0)&&(Battle::action_zone[xx - 1][yy] == i + 2))
-        {
-            xx--;
-            path.first->dir = 0;
-            continue;
-        }
-        if ((yy < V_SLOT_NUMBER - 1)&&(Battle::action_zone[xx][yy + 1] == i + 2))
-        {
-            yy++;
-            path.first->dir = 6;
-            continue;
-        }
-        if ((yy > 0)&&(Battle::action_zone[xx][yy - 1] == i + 2))
-        {
-            yy--;
-            path.first->dir = 2;
-            continue;
-        }
-        if ((xx < H_SLOT_NUMBER - 1)&&(Battle::action_zone[xx + 1][yy] == i + 2))
-        {
-            xx++;
-            path.first->dir = 4;
-            continue;
-        }
-        Battle::grid[xx][yy] = NULL;
-        path.Remove();
-        direction = path.first->dir;
-        image_speed = 0.06 * speed;
-        state = 1;
-        Audio::Play(sounds[1]);
-        break;
+        auto pos = unit->GetGridPos();
+        for (auto& i : pos)
+            moveZone[i.first][i.second] = -1;
+    }
+
+    auto pos = grid->GridPos({x, y});
+    Check(pos.first, pos.second, 0);
+
+    for (const auto& unit : grid->GetUnits())
+    {
+        auto pos = unit->GetGridPos();
+        for (auto& i : pos)
+            moveZone[i.first][i.second] = unit == this ? 0 : 0x7FFF;
     }
 }
 
+Grid::GridData<int>* Character::Select()
+{
+    UpdateMoveRange();
+
+    for (const auto& obj : grid->GetUnits())
+    {
+        if (obj && obj->IsDestructable() && obj != this)
+        {
+            const auto pos = obj->GetGridPos();
+            if (pos.empty())
+                continue;
+            int xx = pos[0].first;
+            int yy = pos[0].second;
+            for (int i = (xx > 0) ? xx-1 : 0; i < (xx<moveZone.width-1 ? xx+2 : moveZone.width); i++)
+                for (int j = (yy > 0) ? yy-1 : 0; j < (yy<moveZone.height-1 ? yy+2 : moveZone.height); j++)
+                    if ((moveZone[i][j]>=0) && (attack->GetAp()+moveZone[i][j] < moveZone[xx][yy]))
+                        moveZone[xx][yy] = moveZone[i][j]+attack->GetAp();
+        }
+    }
+    return &moveZone;;
+}
+
+bool Character::IsMoving() const
+{
+    return (state != STAND);
+}
+
+UnitInfo Character::GetUnitInfo() const
+{
+    return UnitInfo({stats, base_stats, player, spriteset[0][6]->images[0]});
+}
 //------------------------------------------------------------------------------
 
 bool Character::Attack(Character* obj)
 {
-    int xx, yy, dir, targetx, targety, dist(0);
+    auto pos = grid->GridPos(obj->GetWorldPos());
+    const int xx = pos.first;
+    const int yy = pos.second;
+    int move_x = xx;
+    int move_y = yy;
+    for (int i = (xx > 0) ? xx-1 : 0; i < (xx<moveZone.width-1 ? xx+2 : moveZone.width); i++)
+        for (int j = (yy > 0) ? yy-1 : 0; j < (yy<moveZone.height-1 ? yy+2 : moveZone.height); j++)
+            if (moveZone[i][j] < moveZone[move_x][move_y])
+            {
+                move_x = i;
+                move_y = j;
+            }
 
-    xx = (int)(obj->x - GRID_X) / SLOT;
-    yy = (int)(obj->y - GRID_Y) / SLOT;
-    Battle::active_control = false;
-
-    if ((xx > 0)&&(yy > 0)&&(Battle::action_zone[xx - 1][yy - 1] > dist))
-    {
-        dir = 1;
-        targetx = xx - 1;
-        targety = yy - 1;
-        dist = Battle::action_zone[xx - 1][yy - 1];
-    }
-
-    if ((xx > 0)&&(yy < V_SLOT_NUMBER - 1)&&(Battle::action_zone[xx - 1][yy + 1] > dist))
-    {
-        dir = 7;
-        targetx = xx - 1;
-        targety = yy + 1;
-        dist = Battle::action_zone[xx - 1][yy + 1];
-    }
-
-    if ((xx < H_SLOT_NUMBER - 1)&&(yy > 0)&&(Battle::action_zone[xx + 1][yy - 1] > dist))
-    {
-        dir = 3;
-        targetx = xx + 1;
-        targety = yy - 1;
-        dist = Battle::action_zone[xx + 1][yy - 1];
-    }
-    if ((xx < H_SLOT_NUMBER - 1)&&(yy < V_SLOT_NUMBER - 1)&&(Battle::action_zone[xx + 1][yy + 1] > dist))
-    {
-        dir = 5;
-        targetx = xx + 1;
-        targety = yy + 1;
-        dist = Battle::action_zone[xx + 1][yy + 1];
-    }
-    if ((xx > 0)&&(Battle::action_zone[xx - 1][yy] > dist))
-    {
-        dir = 0;
-        targetx = xx - 1;
-        targety = yy;
-        dist = Battle::action_zone[xx - 1][yy];
-    }
-    if ((yy < V_SLOT_NUMBER - 1)&&(Battle::action_zone[xx][yy + 1] > dist))
-    {
-        dir = 6;
-        ;
-        targetx = xx;
-        targety = yy + 1;
-        dist = Battle::action_zone[xx][yy + 1];
-    }
-    if ((yy > 0)&&(Battle::action_zone[xx][yy - 1] > dist))
-    {
-        dir = 2;
-        targetx = xx;
-        targety = yy - 1;
-        dist = Battle::action_zone[xx][yy - 1];
-    }
-    if ((xx < H_SLOT_NUMBER - 1)&&(Battle::action_zone[xx + 1][yy] > dist))
-    {
-        dir = 4;
-        targetx = xx + 1;
-        targety = yy;
-        dist = Battle::action_zone[xx + 1][yy];
-    }
-
-    if (dist == 0)
-    {
-        Battle::active_control = true;
+    if (move_x == xx && move_y == yy)
         return false;
-    }
-    else
+
+    if ((Move(move_x, move_y)==std::pair<int, int>({move_x, move_y})) && (stats.ap >= attack->GetAp()) && (obj->GetUnitInfo().player != player))
     {
-        target = (Character*)Battle::grid[xx][yy];
-        if (dist > movement)
-        {
-            direction = dir;
-            state = 2;
-            image_index = 0.0f;
-            image_speed = 0.5f;
-        }
-        else
-        {
-            path.Add(0.0f, 0.0f);
-            path.first->dir = dir;
-            path.first->att = true;
-            Move(targetx, targety);
-        }
-    }
-    return true;
-}
-
-//------------------------------------------------------------------------------
-
-float Character::Speed_x(int dir)
-{
-    switch (dir)
-    {
-        case 0: return 1.0f * speed;
-        case 1: case 7: return 0.7071f * speed;
-        case 2: case 6: return 0.0f;
-        case 3: case 5: return -0.7071f * speed;
-        case 4: return -1.0f * speed;
-    }
-    return 0.0f;
-}
-
-//------------------------------------------------------------------------------
-
-float Character::Speed_y(int dir)
-{
-    switch (dir)
-    {
-        case 0: case 4: return 0.0f;
-        case 1: case 3: return 0.7071f * speed;
-        case 2: return 1.0f * speed;
-        case 5: case 7: return -0.7071f * speed;
-        case 6: return -1.0f * speed;
-    }
-    return 0.0f;
-}
-
-//------------------------------------------------------------------------------
-
-void Character::Animation_End()
-{
-    if (state == 0)
-        image_speed = 0.0f;
-
-    if (state == 2)
-    {
-        state = 0;
-        image_speed = 0.0f;
-        if (!ranged)
-            Battle::active_control = true;
-    }
-
-    if (state == 3)
-    {
-        image_speed = 0.0f;
-        sprite = spriteset[3][direction];
-        image_index = sprite->image_number - 1;
-        z = -1400.0f;
-    }
-}
-
-//------------------------------------------------------------------------------
-
-void Character::Damage(int damage)
-{
-    damage = damage > 1 ? damage : 1;
-    damage = damage < hp ? damage : hp;
-    hp -= damage;
-    Damage_Report* obj = (Damage_Report*)Battle::Create(21, x, y);
-    obj->SetValue(std::to_string(-damage));
-}
-
-//------------------------------------------------------------------------------
-
-bool Character::Collision(float xx, float yy, int damage)
-{
-    if (std::sqrt((xx - x)*(xx - x)+(yy - y)*(yy - y)) < radius)
-    {
-        if (damage != 0)
-        {
-            damage = damage - (damage * def2) / 100;
-            Damage(damage);
-            if (player == 2)
-                Stats::Damage(damage, true);
-
-
-        }
+        target = obj;
         return true;
     }
-    else
-        return false;
+    return false;
+}
+
+void Character::SetDirection(std::complex<float> dest)
+{
+    direction = (arg(dest-std::complex<float>(x,y))*4.0f/3.14f);
+    if (direction < 0)
+        direction = 8 + direction;
 }
 
 //------------------------------------------------------------------------------
-
-void Character::EndTurn()
+void Character::Animation_End()
 {
-    movement = maxmove;
-    att = true;
+    if (state == STAND)
+        image_speed = 0.0f;
+
+    if (state == ATTACK)
+    {
+        state = STAND;
+        image_speed = 0.0f;
+    }
+
+    if (state == DIE)
+    {
+        state = DEAD;
+        image_index = sprite->images.size()-1;
+        stats.ap = 0;
+        return;
+    }
+    image_index -= sprite->images.size();
 }
 
-//------------------------------------------------------------------------------
-
-void Character::Att_End()
+void Character::ApplyEffects(float dt)
 {
-    int damage = dmg + std::rand() % (dmg2 + 1);
-    damage = damage - (damage * target->def) / 100;
-    target->Damage(damage);
-    if (player == 1)
-        Stats::Damage(damage, false);
-    Battle::Select(this);
-}
-
-//------------------------------------------------------------------------------
-
-void Character::Step()
-{
-    if ((state != 3)&&(hp < 1))
+    if (dt != 0.0f)
     {
-        state = 3;
-        Audio::Play(sounds[2]);
-        image_speed = 0.3f;
-        image_index = 0.0f;
-        if (player == 2)
-            Stats::Die();
-        player = 0;
-
-        Battle::grid[(int)(x - GRID_X) / SLOT][(int)(y - GRID_Y) / SLOT] = NULL;
-    }
-    sprite = spriteset[state][direction];
-    image_index += image_speed;
-    if (image_index >= sprite->image_number)
-    {
-        image_index -= sprite->image_number;
-        Animation_End();
-    }
-    if (state == 0)
-    {
-        if (rand() % 300 == 0)
-            image_speed = 0.25f;
-    }
-    if (state == 1)
-    {
-        x += Speed_x(direction);
-        y += Speed_y(direction);
-        if (fabs(x - path.first->x) + fabs(y - path.first->y) < speed)
+        for (auto it = effects.begin(); it!= effects.end();)
         {
-            x = path.first->x;
-            y = path.first->y;
-            path.Remove();
-            if (path.count > 0)
+            if ((*it)->UpdateLife(dt) == false)
             {
-                direction = path.first->dir;
-                if (path.first->att)
-                {
-                    state = 2;
-                    Audio::Stop(sounds[1]);
-                    image_index = 0;
-                    path.Remove();
-                }
+                delete *it;
+                effects.erase(it);
+                continue;
+            }
+            it++;
+        }
+    }
+    stats.ap_regen = base_stats.ap_regen;
+    stats.dmg_base = base_stats.dmg_base;
+    stats.dmg_rand = base_stats.dmg_rand;
+    std::memcpy(stats.defense, base_stats.defense, sizeof(stats.defense));
+    for (auto i : effects)
+        i->Apply(stats);
+}
+
+//------------------------------------------------------------------------------
+void Character::ExecuteAttack()
+{
+   target->Damage(attack->GetDamage());
+   Select();
+}
+
+int Character::Damage(AttackDamage&& dmg)
+{
+    int damage = dmg.base + dmg.rand * std::rand() / RAND_MAX;
+    damage = damage - (damage * stats.defense[dmg.type]) / 100.0f;
+    damage = damage > 1 ? damage : 1;
+
+    if (damage >= stats.hp)
+    {
+        damage = stats.hp;
+        state = DIE;
+        Audio::Play(sounds[2]);
+        image_speed = 16.0f;
+        stats.ap = 0;
+        stats.hp = 0;
+        grid_size = 0;
+    }
+    else
+        stats.hp -= damage;
+    if ((dmg.effect) && (20+std::rand()%80 >= stats.defense[dmg.type]))
+    {
+        bool addeffect = true;
+        for (auto eff : effects)
+        {
+            if (*eff == *dmg.effect)
+            {
+                eff->ResetLife();
+                addeffect = false;
+                break;
+            }
+        }
+        new Effect_Report(x, y, dmg.effect->Name());
+        if (addeffect)
+        {
+            effects.push_back(dmg.effect);
+            dmg.effect = nullptr;
+            ApplyEffects();
+        }
+    }
+    new Damage_Report(x, y, std::to_string(-damage));
+    return damage;
+}
+//------------------------------------------------------------------------------
+
+void Character::EndTurn(float step, bool active)
+{
+    if (step < 0)
+        return;
+
+    if (stats.hp > 0)
+    {
+        if (active)
+            stats.ap = stats.ap > 1.0f ? stats.ap-1.0f : 0.0f;
+        ApplyEffects(step);
+        float ap_gain = stats.ap_regen * step;
+        if (ap_gain > base_stats.ap-stats.ap)
+            ap_gain = base_stats.ap-stats.ap;
+        stats.ap += ap_gain;
+        if (ap_gain >= 1.0f)
+            new AP_Report(x, y, std::string("+")+std::to_string(int(ap_gain))+" AP");
+    }
+}
+
+float Character::GetSize() const
+{
+    return stats.hp > 0 ? 24.0f : 0.0f;
+}
+
+void Character::Enable(bool en)
+{
+    image->Enable(en);
+    hp_bar.Enable(en);
+}
+
+const std::vector<AttackType*>& Character::GetAttackTypes() const
+{
+    return att_types;
+}
+
+void Character::SelectAttack(int index)
+{
+    attack = att_types[index];
+    Select();
+}
+//------------------------------------------------------------------------------
+
+void Character::Step(float dt)
+{
+    if (state == DEAD)
+        return;
+    sprite = spriteset[state][direction];
+    image_index += image_speed*dt;
+    if (image_index >= sprite->images.size())
+        Animation_End();
+
+    if (state == MOVE)
+    {
+        if (fabs(x - path.back().real()) + fabs(y - path.back().imag()) <= speed*dt)
+        {
+            x = path.back().real();
+            y = path.back().imag();
+            path.pop_back();
+            if (!path.empty())
+            {
+                SetDirection(path.back());
             }
             else
             {
                 image_speed = 0.0f;
                 image_index = 0.0f;
-                state = 0;
+                state = STAND;
                 Audio::Stop(sounds[1]);
-                Battle::Select(this);
-                Battle::active_control = true;
+                Select();
             }
         }
-        z = -y;
+        else
+        {
+            x += speed_x[direction]*dt;
+            y += speed_y[direction]*dt;
+        }
     }
-    if ((state == 2)&&(att)&&(!ranged)&&(image_index > 0.6f * sprite->image_number))
+
+    if ((state == ATTACK)&&(target)&&(image_index > 0.6f * sprite->images.size()))
     {
-        att = false;
         Audio::Play(sounds[0]);
-        Att_End();
+        ExecuteAttack();
+        target = nullptr;
     }
-    Game_Object::Step();
+
+    if (state == STAND)
+    {
+        if (rand() % 400 == 0)
+            image_speed = 12.0f;
+        if (target)
+        {
+            if (attack->GetAp() <= stats.ap)
+            {
+                state = ATTACK;
+                image_index = 0;
+                image_speed = 14.0f;
+                SetDirection(target->GetWorldPos());
+                stats.ap -= attack->GetAp();
+            }
+            else
+                target = nullptr;
+        }
+    }
+    if (stats.hp)
+    {
+        hp_bar.SetPosition(x-Grid::slotSize/2.2f, y-Grid::slotSize/2.25f);
+        hp_bar.SetValue(float(stats.hp)/float(base_stats.hp));
+    }
+    else
+    {
+        hp_bar.Enable(false);
+    }
+    z = state == DEAD ? -y-100 : -y;
+    image->SetPosition(x-sprite->x0, y-sprite->y0, z);
+    image->SetTile(sprite->images[int(image_index)]);
 }
 //------------------------------------------------------------------------------
+
+void Character::Check(int grid_x, int grid_y, int ind)
+{
+    moveZone[grid_x][grid_y] = ind;
+    if((grid_y+1<moveZone.height)&&(moveZone[grid_x][grid_y+1] > ind+2))
+        Check(grid_x, grid_y+1, ind+2);
+    if((grid_y>0)&&(moveZone[grid_x][grid_y-1] > ind+2))
+        Check(grid_x, grid_y-1, ind+2);
+    if((grid_x+1<moveZone.width)&&(moveZone[grid_x+1][grid_y] > ind+2))
+        Check(grid_x+1, grid_y, ind+2);
+    if((grid_x>0)&&(moveZone[grid_x-1][grid_y] > ind+2))
+        Check(grid_x-1, grid_y, ind+2);
+    if((grid_x+1 < moveZone.width)&&(grid_y+1<moveZone.height)&&(moveZone[grid_x+1][grid_y+1] > ind+3))
+        Check(grid_x+1, grid_y+1, ind+3);
+    if((grid_x+1 < moveZone.width)&&(grid_y > 0)&&(moveZone[grid_x+1][grid_y-1] > ind+3))
+        Check(grid_x+1, grid_y-1, ind+3);
+    if((grid_x > 0)&&(grid_y+1<moveZone.height)&&(moveZone[grid_x-1][grid_y+1] > ind+3))
+        Check(grid_x-1, grid_y+1, ind+3);
+    if((grid_x > 0)&&(grid_y > 0)&&(moveZone[grid_x-1][grid_y-1] > ind+3))
+        Check(grid_x-1, grid_y-1, ind+3);
+}
+
+void Character::GetPath(int grid_x, int grid_y)
+{
+    if (stats.ap >= moveZone[grid_x][grid_y])
+        path.push_back(grid->WorldPos({grid_x, grid_y}));
+
+    int val = moveZone[grid_x][grid_y];
+
+    if((grid_y+1<moveZone.height)&&(moveZone[grid_x][grid_y+1]+2 == val))
+        GetPath(grid_x, grid_y+1);
+    else if((grid_y>0)&&(moveZone[grid_x][grid_y-1]+2 == val))
+        GetPath(grid_x, grid_y-1);
+    else if((grid_x+1<moveZone.width)&&(moveZone[grid_x+1][grid_y]+2 == val))
+        GetPath(grid_x+1, grid_y);
+    else if((grid_x>0)&&(moveZone[grid_x-1][grid_y]+2 == val))
+        GetPath(grid_x-1, grid_y);
+    else if((grid_x+1 < moveZone.width)&&(grid_y+1<moveZone.height)&&(moveZone[grid_x+1][grid_y+1]+3 == val))
+        GetPath(grid_x+1, grid_y+1);
+    else if((grid_x+1 < moveZone.width)&&(grid_y > 0)&&(moveZone[grid_x+1][grid_y-1]+3 == val))
+        GetPath(grid_x+1, grid_y-1);
+    else if((grid_x > 0)&&(grid_y+1<moveZone.height)&&(moveZone[grid_x-1][grid_y+1]+3 == val))
+        GetPath(grid_x-1, grid_y+1);
+    else if((grid_x > 0)&&(grid_y > 0)&&(moveZone[grid_x-1][grid_y-1]+3 == val))
+        GetPath(grid_x-1, grid_y-1);
+}

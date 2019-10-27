@@ -2,25 +2,23 @@
 #define BOBJECT_H
 #include "Picture.h"
 #include "graphic/sprite.h"
+#include "GameObject.h"
+#include "grid.h"
 
-//------------------------------------------------------------------------------
-class Game_Object
+
+class Unit : public GameObject, public Grid::GridObject
 {
 public:
-    Game_Object(float xx, float yy, float zz);
-    virtual ~Game_Object();
-    virtual void EndTurn(){};
-    virtual void Step();
-    virtual bool Collision(float,float,int);  
-    Game_Object* next;
-    int player;
-    float x ,y, z;  
-    float image_index;
+    Unit(int p = 0);
+    virtual ~Unit();
+    bool IsDestructable() const override;
+    virtual void Enable(bool en = false);
 protected:
+    float image_index;
     Sprite* sprite;
     Picture* image;
     float image_speed;
-    float radius;  
+    int player;
 };
 //------------------------------------------------------------------------------
 #endif

@@ -5,17 +5,28 @@
 #include "GraphicObject.h"
 
 struct Character;
-struct Vertex;
+
+struct Vertex
+{
+    Vertex(float xx, float yy, float uu, float vv):x(xx),y(yy),z(0.0f),u(uu),v(vv){};
+    float x;
+    float y;
+    float z;
+    float u;
+    float v;
+};
 
 class TextObj : public GraphicObject
 {
 public: 
     TextObj(float xx, float yy, std::string text);
+    TextObj(const TextObj&) = delete;
+    TextObj(TextObj&& obj);
     ~TextObj();   
     void SetText(std::string text);
     void AddText(std::string text, float x_offset, float y_offset);
 private:
-    void Render() override;
+    void Render() const override;
     static void LoadResources();
     void AddSymbol(char symbol, float initial_x);  
     float offset_x;

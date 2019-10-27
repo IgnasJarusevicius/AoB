@@ -1,99 +1,152 @@
 #include "ranged.h"
-#include "Battle.h"
 #include <cstdlib>
 #include <cmath>
 #include "audio.h"
+#include "graphic/gres.h"
+#include <iostream>
 
-Ranged::Ranged(float xx, float yy, const UnitStats &stats) : Character(xx, yy, stats)
+Ranged::Ranged(const UnitResources &s, int p) :
+    Character(s, p),
+    arrow(nullptr)
 {
-    ranged = true;
 }
 //------------------------------------------------------------------------------
-
-bool Ranged::Attack(Character* target)
+void Ranged::ExecuteAttack()
 {
-    Arrow* obj;
-    float dir;
-    const float pi = std::acos(-1);
-    Battle::active_control = false;
-    state = 2;
-    image_speed = 0.3f;
-    image_index = 0.0f;
-    obj = (Arrow*)Battle::Create(20, x, y);
-    dir = atan2(target->y - y, target->x - x);
-    obj->xspeed = 2.0f * std::cos(dir);
-    obj->yspeed = 2.0f * std::sin(dir);
-    obj->shooter = this;
-    obj->delay = 16;
-    obj->dmg = dmg + std::rand() % (dmg2 + 1);
-    if (dir < -0.875f * pi)
-        direction = 4;
-    else if (dir < -0.625f * pi)
-        direction = 5;
-    else if (dir < -0.375f * pi)
-        direction = 6;
-    else if (dir < -0.125f * pi)
-        direction = 7;
-    else if (dir < 0.125f * pi)
-        direction = 0;
-    else if (dir < 0.375f * pi)
-        direction = 1;
-    else if (dir < 0.625f * pi)
-        direction = 2;
-    else if (dir < 0.875f * pi)
-        direction = 3;
-    else direction = 4;
-    obj->image_index = 0;
-    for (int i = 1; i < 32; i++)
-        if (dir <= (i - 15) * pi / 16.0f - pi / 32.0f)
-        {
-            obj->image_index = i;
-            break;
-        }
-    return 1;
+    arrow = new Arrow(this);
 }
 
-//------------------------------------------------------------------------------
-
-Arrow::Arrow(float set_x, float set_y) : Game_Object(set_x, set_y, -set_y)
+bool Ranged::IsMoving() const
 {
-    player = 0;
-    sprite = Graphic_Resources::sprites[ARROW];
-    image = new Picture(x, y, -y, sprite->images[0]);
+    if (arrow)
+        return true;
+    return Character::IsMoving();
 }
 
-//------------------------------------------------------------------------------
-
-void Arrow::Step()
+Grid::GridData<int>* Ranged::Select()
 {
-    Game_Object* obj;
-    z = -y;
-    if (delay != 0)
+    if (state != STAND)
+        return nullptr;
+    UpdateMoveRange();
+    for (const auto& obj : grid->GetUnits())
     {
-        if (delay == 1)
+        if (obj && obj->IsDestructable() && obj != this)
         {
-            Audio::Play(PLAY_BOW);
-            shooter->att = false; //fixing bugs
+            const auto pos = obj->GetGridPos();
+            if (pos.empty())
+                continue;
+            auto& mv = moveZone[pos[0].first][pos[0].second];
+            if (CollisionLine(obj->GetWorldPos(), {x, y}) == 2)
+            {
+                mv = attack->GetAp();
+            }
+            else
+            {
+                for (unsigned i = 0; i< moveZone.width; i++)
+                    for (unsigned j = 0; j< moveZone.height; j++)
+                        if ((moveZone[i][j]+attack->GetAp() < mv) && (CollisionLine(grid->WorldPos({i, j}), obj->GetWorldPos()) == 1))
+                            mv = moveZone[i][j]+attack->GetAp();
+            }
         }
-        delay--;
-        return;
     }
+    return &moveZone;
+}
 
-    for (int i = 0; i < 10; i++)
+bool Ranged::Attack(Character* obj)
+{
+    int move_x;
+    int move_y;
+
+    if (CollisionLine({x, y}, obj->GetWorldPos()) == 2)
     {
-        x += xspeed;
-        y += yspeed;
-        if ((obj = Battle::grid[(int)(x - GRID_X) / SLOT][(int)(y - GRID_Y) / SLOT]) != NULL)
-            if (obj != shooter)
-                if (obj->Collision(x, y, dmg))
+        auto grid_pos = grid->GridPos({x, y});
+        move_x = grid_pos.first;
+        move_y = grid_pos.second;
+    }
+    else
+    {
+        auto pos = grid->GridPos(obj->GetWorldPos());
+        move_x = pos.first;
+        move_y = pos.second;
+        for (unsigned i = 0; i< moveZone.width; i++)
+            for (unsigned j = 0; j< moveZone.height; j++)
+                if ((moveZone[i][j] < moveZone[move_x][move_y]) && (CollisionLine(grid->WorldPos({i, j}), obj->GetWorldPos()) == 1))
                 {
-                    Audio::Play(PLAY_HIT);
-                    Battle::active_control = true;
-                    Battle::Remove(this);
-                    return;
+                    move_x = i;
+                    move_y = j;
                 }
+        if (move_x == pos.first && move_y == pos.second)
+            return false;
     }
-    Game_Object::Step();
+
+    if ((Move(move_x, move_y)==std::pair<int, int>({move_x, move_y})) && (stats.ap >= attack->GetAp()) && (obj->GetUnitInfo().player != player))
+    {
+        target = obj;
+        return true;
+    }
+    return false;
 }
+
+int Ranged::CollisionLine(std::complex<float> pos1, std::complex<float> pos2) const
+{
+    const float x1 = pos1.real();
+    const float y1 = pos1.imag();
+    const float x2 = pos2.real();
+    const float y2 = pos2.imag();
+    const float k = (std::fabs(x1-x2) < 0.5) ? 0.0f : (y1-y2)/(x1-x2);
+    const float h = y1-k*x1;
+    const float mult = 1.0f/std::sqrt(k*k+1);
+    int ret = 0;
+
+    for (auto& obj : grid->GetUnits())
+        if (obj)
+        {
+            auto pos = obj->GetWorldPos();
+            if ((pos.real() > x1+0.5f) && (pos.real() > x2+0.5f))
+                continue;
+            if ((pos.real() < x1-0.5f) && (pos.real() < x2-0.5f))
+                continue;
+            if ((pos.imag() > y1+0.5f) && (pos.imag() > y2+0.5f))
+                continue;
+            if ((pos.imag() < y1-0.5f) && (pos.imag() < y2-0.5f))
+                continue;
+            if ((std::fabs(k)< 0.01f)||(std::fabs(pos.imag()-k*pos.real()-h)*mult < obj->GetSize()))
+                ret++;
+        }
+    return ret;
+}
+//------------------------------------------------------------------------------
+
+Ranged::Arrow::Arrow(Ranged* owner):
+    shooter(owner),
+    position(shooter->GetWorldPos()),
+    image(shooter->x, shooter->y, -shooter->y, Graphic_Resources::arrow->images[0]),
+    target(shooter->target),
+    destination(target->GetWorldPos()),
+    direction((destination-position)/std::fabs(destination-position))
+{
+    const float pi = std::acos(-1.0);
+    const int img = (pi+arg(direction))*16.0f/pi+0.5f;
+    image.SetTile(Graphic_Resources::arrow->images[img%32]);
+}
+
+//------------------------------------------------------------------------------
+
+void Ranged::Arrow::Step(float dt)
+{
+    const float speed = 750.0f;
+    if (std::fabs(position-destination) < speed*dt)
+    {
+        target->Damage(shooter->attack->GetDamage());
+        shooter->arrow = nullptr;
+        shooter->Select();
+        delete this;
+    }
+    else
+        position += speed*direction*dt;
+    image.SetPosition(position.real()-16, position.imag()-20, 20-position.imag());
+}
+
+
 //------------------------------------------------------------------------------
 

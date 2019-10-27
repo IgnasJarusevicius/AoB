@@ -15,16 +15,6 @@ struct Character
     int origH;
 };
 
-struct Vertex
-{
-    Vertex(float xx, float yy, float uu, float vv):x(xx),y(yy),z(0.0f),u(uu),v(vv){};
-    float x;
-    float y;
-    float z;
-    float u;
-    float v;
-};
-
 const std::vector<Character> font_lut =
 {
     {97,	124,	153,	26,	26,	2,	19,	27,	56},
@@ -139,6 +129,17 @@ TextObj::TextObj(float xx, float yy, std::string text)
     SetText(text);
 }
 
+TextObj::TextObj(TextObj&& obj) :
+    GraphicObject(std::move(obj)),
+    offset_x(obj.offset_x),
+    offset_y(obj.offset_y),
+    ebo(obj.ebo)
+{
+    vertices.swap(obj.vertices);
+    indices.swap(obj.indices);
+    obj.ebo = std::numeric_limits<unsigned int>::max();
+}
+
 void TextObj::LoadResources()
 {
     if (texture != 0)
@@ -154,7 +155,8 @@ void TextObj::LoadResources()
 
 TextObj::~TextObj()
 {
-    glDeleteBuffers(1, &ebo);
+    if (ebo != std::numeric_limits<unsigned int>::max())
+        glDeleteBuffers(1, &ebo);
 }
 
 void TextObj::SetText(std::string text)
@@ -183,7 +185,7 @@ void TextObj::AddText(std::string text, float xx, float yy)
 }
 
 
-void TextObj::Render()
+void TextObj::Render() const
 {
     glBindTexture(GL_TEXTURE_2D, texture);
     glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);

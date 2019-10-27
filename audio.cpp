@@ -139,12 +139,12 @@ ALboolean Audio::LoadBuffer(const char* fileName, int ind)
     file = fopen(fileName, "rb");
     if (file == NULL) return AL_FALSE;
     fseek(file, 22, SEEK_SET);
-    fread(&channels, 2, 1, file);
-    fread(&freq, 4, 1, file);
+    fread(&channels, sizeof(channels), 1, file);
+    fread(&freq, sizeof(freq), 1, file);
     fseek(file, 34, SEEK_SET);
-    fread(&samplebits, 2, 1, file);
+    fread(&samplebits, sizeof(samplebits), 1, file);
     fseek(file, 40, SEEK_SET);
-    fread(&size, 4, 1, file);
+    fread(&size, sizeof(size), 1, file);
     //	reading data
     data = new unsigned char[size];
     fread(data, sizeof (char), size, file);

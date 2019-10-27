@@ -1,27 +1,35 @@
 #include "GameObject.h"
 
-ObjectGroup::~ObjectGroup()
+std::forward_list<GameObject*> GameObject::objList;
+
+GameObject::GameObject()
 {
-    for (auto& obj : objects)
-        delete obj;
+    objList.push_front(this);
 }
 
-int ObjectGroup::Step(float deltaTime)
+GameObject::~GameObject()
 {
-    for (auto& obj : objects)
-        obj->Step(deltaTime);
-    return 0;
+    objList.remove(this);
 }
 
-void ObjectGroup::Add(GameObject* obj)
+void GameObject::UpdateAll(float dt)
 {
-    objects.push_back(obj);
+    auto it = objList.begin();
+    while (it != objList.end())
+    {
+        auto tmp = *it++;       //allow removing items while iterating
+        tmp->Step(dt);
+    }
 }
 
-void ObjectGroup::Enable(bool en)
+void GameObject::Clear()
 {
-    for (auto& obj : objects)
-        obj->Enable(en);
+    auto it = objList.begin();
+    while (it != objList.end())
+    {
+        auto tmp = *it++;
+        delete tmp;
+    }
 }
 
 

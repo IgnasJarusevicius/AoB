@@ -17,8 +17,10 @@ public:
 protected:
     glm::mat4 transform;
     GraphicObject();
+    GraphicObject(const GraphicObject&) = delete;
+    GraphicObject(GraphicObject&& obj);
     virtual ~GraphicObject();
-    virtual void Render() = 0;   
+    virtual void Render() const = 0;   
     bool enabled;
     GLuint vbo; //vertex buffer object
     GLuint vao; //vertex array object

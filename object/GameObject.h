@@ -1,27 +1,23 @@
 #pragma once
 #include <vector>
+#include <forward_list>
 //------------------------------------------------------------------------------
 
 class GameObject
 {
 public:
-    GameObject() = default;
-    virtual ~GameObject() = default;
-    virtual int Step(float deltaTime = 0.0f)=0;
-    virtual void Enable(bool en = true) = 0;
+    static void UpdateAll(float dt);
+    static void Clear();
+    virtual ~GameObject();
+    virtual void Step(float deltaTime = 0.0f){};
+    virtual void Enable(bool en = true){};
+protected:
+    GameObject(); 
+private:
+    static std::forward_list<GameObject*> objList;
 };
 
-class ObjectGroup : public GameObject
-{
-public:
-    ObjectGroup() = default;
-    ~ObjectGroup();
-    int Step(float deltaTime = 0.0f) override;
-    void Add(GameObject* obj);
-    void Enable(bool en = true);
-private:
-    std::vector<GameObject*> objects;    
-};
+
 
 
 
