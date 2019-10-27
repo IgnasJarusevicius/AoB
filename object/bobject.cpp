@@ -1,22 +1,33 @@
 #include "bobject.h"
-#include "math.h"
 
 //------------------------------------------------------------------------------
-void Game_Object::Draw()
-{ 
- if (player == 2)
- glColor3f(0.6f,0.6f,0.6f);
- else
- glColor3f(1.0f,1.0f,1.0f); 
- Draw_Texture(sprite->images[(int)floor(image_index)],x+sprite->x1,x+sprite->x2,y+sprite->y1,y+sprite->y2,z);  
+Game_Object::Game_Object(float xx, float yy, float zz): x(xx),y(yy),z(zz)
+{
+    image_speed = 0.0f;
+    image_index = 0.0f;
+    image = nullptr;
+}
+
+Game_Object::~Game_Object()
+{
+    if (image)
+        delete image;
+    image = nullptr;
+}
+
+void Game_Object::Step()
+{
+    image->SetColor(player == 2 ? glm::vec3(0.6f,0.6f,0.6f) : glm::vec3(1.0f,1.0f,1.0f));
+    image->SetPosition(x+(sprite->x1+sprite->x2)/2,y+(sprite->y1+sprite->y2)/2, -y);
+    image->SetTexture(sprite->images[(int)floor(image_index)]);
  }
- 
-//------------------------------------------------------------------------------ 
+
+//------------------------------------------------------------------------------
 bool Game_Object::Collision(float xx,float yy, int dmg)
 {
- if ( sqrt((xx-x)*(xx-x)+(yy-y)*(yy-y))<radius)
- return true;
- else
- return false;
+    if ( std::sqrt((xx-x)*(xx-x)+(yy-y)*(yy-y))<radius)
+        return true;
+    else
+        return false;
  }
 //------------------------------------------------------------------------------

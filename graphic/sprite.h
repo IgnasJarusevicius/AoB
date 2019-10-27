@@ -8,18 +8,7 @@ class Sprite
          GLuint* images;
          float image_number;
          Sprite(const char* name, int cnt, int xof = -1, int yof = 0);
-         Sprite(Sprite* spr, int ind); 
-         ~Sprite();
- private:
-         GLuint LoadTexture(const char * filename);  
-         
- };
-//------------------------------------------------------------------------------ 
-class SpriteSet
-{
- public: ~SpriteSet();
-         Sprite* sprites[4][8];
- 
-      };  
-//------------------------------------------------------------------------------            
+         Sprite(const Sprite* spr, int ind); 
+         ~Sprite();       
+};     
 #endif 

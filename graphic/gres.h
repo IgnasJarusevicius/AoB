@@ -14,40 +14,37 @@
 #define ROCK1 1
 #define TREE1 2
 
-#define SPRITESETS 11
-#define ORC 0
-#define PIRATE 1
-#define HUNTER 2
-#define SKELARC 3
-#define SKELWAR 4
-#define BARBAR 5
-#define ARCHER 6
-#define VIKING 7
-#define LAVA 8
-#define KNIGHT 9
-#define DWARF 10
-
+typedef Sprite* SpriteSet[4][8];
 
 class Graphic_Resources
 {
- public: static SpriteSet* spritesets[SPRITESETS];
-         static Sprite* sprites[SPRITES]; 
-         static GLuint textures[TEXTURES];        
-         static void Load_Graphics(); 
-         static void Delete_All();       
+ public:
+    static SpriteSet orc_sprites;
+    static SpriteSet pirate_sprites;
+    static SpriteSet hunter_sprites;
+    static SpriteSet skelarc_sprites;
+    static SpriteSet skelwar_sprites;
+    static SpriteSet barbar_sprites;
+    static SpriteSet archer_sprites;
+    static SpriteSet viking_sprites;
+    static SpriteSet lava_sprites;
+    static SpriteSet knight_sprites;
+    static SpriteSet dwarf_sprites;
+    static Sprite* sprites[SPRITES]; 
+    static GLuint textures[TEXTURES];        
+    static void Load_Graphics();      
 private: 
-         static void Load_Textures();
-         static void Load_Orc();
-         static void Load_SkelArc();
-         static void Load_SkelWar();
-         static void Load_Hunter();
-         static void Load_Pirate();
-         static void Load_Barbar();
-         static void Load_Archer();
-         static void Load_Viking();
-         static void Load_Lava();
-         static void Load_Knight();
-         static void Load_Dwarf();
-         static GLuint LoadTexture(const char *);                     
+    static void Load_Textures();
+    static void Load_Orc();
+    static void Load_SkelArc();
+    static void Load_SkelWar();
+    static void Load_Hunter();
+    static void Load_Pirate();
+    static void Load_Barbar();
+    static void Load_Archer();
+    static void Load_Viking();
+    static void Load_Lava();
+    static void Load_Knight();
+    static void Load_Dwarf();                  
  };  
 #endif

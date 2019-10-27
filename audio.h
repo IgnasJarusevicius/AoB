@@ -34,20 +34,21 @@
 #define PLAY_WHIP 12
 //------------------------------------------------------------------------------
 
-class Audio
-{
-      public: static ALuint Buffers[BUFFERS];
-              static ALboolean Init();
-              static ALuint sources[SOURCES];
-              static void Play(int sc);
-              static void Stop(int sc);
-              static void Unload();          
-                
-      private: static ALboolean LoadBuffer(char* fileName, int ind);
-               static ALboolean CreateSources();
-               static ALboolean LoadAudio();
-               static void SetListenerValues();
-               static ALboolean Source(int ind, int buff,float pitch, float gain, ALboolean loop);
-      };
+class Audio {
+public:
+    static ALuint Buffers[BUFFERS];
+    static ALboolean Init();
+    static ALuint sources[SOURCES];
+    static void Play(int sc);
+    static void Stop(int sc);
+    static void Unload();
+
+private:
+    static ALboolean LoadBuffer(const char* fileName, int ind);
+    static ALboolean CreateSources();
+    static ALboolean LoadAudio();
+    static void SetListenerValues();
+    static ALboolean Source(int ind, int buff, float pitch, float gain, ALboolean loop);
+};
 //------------------------------------------------------------------------------     
 #endif

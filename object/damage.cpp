@@ -1,31 +1,27 @@
 #include "damage.h"
-#include "game.h"
+#include "Battle.h"
 
-Damage_Report::Damage_Report(float setx, float sety)
+Damage_Report::Damage_Report(float setx, float sety) : Game_Object(setx, sety, 0), text(setx, sety, "")
 {
- x = setx;
- y = sety;
- life = 50;
- }
+    life = 50;
+    text.SetColor(glm::vec3(1.0f,0.0f,0.0f));
+}
 
-Damage_Report::~Damage_Report()
+void Damage_Report::SetValue(std::string val)
 {
- delete [] str;
- }                               
+    text.SetText(val);
+}
 
 void Damage_Report::Step()
 {
- y += life*0.05;
- if (life > 0)
- life--;
- else
- Game::Remove(this) ;   
- } 
- 
-void Damage_Report::Draw()
-{
- glColor3f(1.0f,0.0f,0.0f);
- glRasterPos2f(x-10.0f,y+8.0f);
- glutBitmapString( GLUT_BITMAP_9_BY_15, (const unsigned char*)str );
- glColor3f(1.0f,1.0f,1.0f); 
- } 
+    if (life > 0)
+    {
+        life--;
+        y += life*0.05;
+        text.SetPosition(x-10.0f,y+8.0f);
+    }
+    else
+        Battle::Remove(this) ;
+ }
+
+

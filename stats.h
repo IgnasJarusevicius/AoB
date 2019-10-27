@@ -3,7 +3,7 @@
 
 class Stats
 {
-public: 
+public:
     static int score;
     static int multi;
     static int level; 
@@ -16,7 +16,6 @@ public:
     static void Die();
     static void EndTurn();
     static void Add (int i,int val);
-    static void Draw(float,float); 
     static void Unlock();        
 };
 #endif

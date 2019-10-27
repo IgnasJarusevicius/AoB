@@ -1,479 +1,379 @@
-#include "game.h"
+#include "Battle.h"
 #include "audio.h"
 #include "controller.h"
-#include <math.h>
-#include <stdio.h>
+#include "Rectangle.h"
+#include <glm/gtc/matrix_transform.hpp>
+#include "stats.h"
+#include "object/object.h"
 #define POINTS 8
 
 //------------------------------------------------------------------------------
-extern Controller* game;
+
+int Controller::team[] = {0};
 
 //------------------------------------------------------------------------------
-Menu::Menu(Controller* c)
+
+class UnitButton : public MenuButton
 {
- active_game = c;                      
- }
+public:
+    typedef std::function<void(void)> CallbackFunction;
+
+    UnitButton(float xx, float yy, unsigned tex):
+            MenuButton(xx, yy, tex),
+            outline(x-width/2, y-height/2, width-1, height)
+    {
+
+    };
+    int Step(float deltaTime = 0.0f) override
+    {
+        if (!enabled)
+        {
+            outline.SetColor(glm::vec3(1.0f, 0.0f, 0.0f));
+            return 0;
+        }
+        if (Mouse::Position(x-width/2, x + width/2, y-height/2, y + height/2))
+        {
+            if (Mouse::Button(Mouse::LEFT_UP))
+            {
+                Audio::Play(PLAY_CLICK);
+                if (callback)
+                    callback();
+                return 1;
+            }
+            outline.SetColor(glm::vec3(0.0f, 1.0f, 0.0f));
+            return 0;
+        }
+        outline.SetColor(glm::vec3(1.0f, 0.0f, 0.0f));
+        return 0;
+    };
+private:
+    RectangleOutline outline;
+};
+
+Menu::Menu(bool resumeGame) :
+      title(512.0f, 640.0f, 0.0f, Graphic_Resources::textures[TITLE])
+{
+    state = 0;
+    MenuButton* b;
+    buttons.Add(b = new MenuButton(512, 244.0f, Graphic_Resources::textures[MENU], 0.6f, 0.8f));
+    b->SetCallback([this](){state = menuExit;});
+
+    buttons.Add(b = new MenuButton(512, 308.0f, Graphic_Resources::textures[MENU], 0.4f, 0.6f));
+    b->SetCallback([this](){ChangeItemVisibility(true, false, false);});
+
+    buttons.Add(b = new MenuButton(512, 372.0f, Graphic_Resources::textures[MENU], 0.2f, 0.4f));
+    b->SetCallback([this](){ChangeItemVisibility(true, false, true);});
+
+    buttons.Add(b = new MenuButton(512, 436.0f, Graphic_Resources::textures[MENU], 0.0f, 0.2f));
+    b->SetCallback([this](){state = menuNew;});
+
+    backButton = new MenuButton(128.0f, 52.0f, Graphic_Resources::textures[MENU], 0.8f, 1.0f);
+    backButton->SetCallback([this](){ChangeItemVisibility(false, true, false);});
+    backButton->Enable(false);
+
+    txtLines = new TextObj(280.0f, 450.0f, "Mouse Left Button\n\nMouse Right Button\n\nSPACE\n\nESC");
+    txtLines->AddText("Select\n\nMove / Attack\n\nEnd Turn\n\nMenu", 560.0f, 0.0f);
+    txtLines->SetColor(glm::vec3(0.1f, 0.8f, 0.8f));
+    txtLines->SetScale(0.6f);
+    txtLines->Enable(false);
+}
+
+void Menu::ChangeItemVisibility(bool en_back, bool en_menu, bool en_txt)
+{
+    backButton->Enable(en_back);
+    buttons.Enable(en_menu);
+    txtLines->Enable(en_txt);
+}
 
 Menu::~Menu()
 {
- if (active_game)
- delete active_game;            
- }
+    delete txtLines;
+    delete backButton;
+}
+//------------------------------------------------------------------------------
+
+int Menu::Update()
+{
+    backButton->Step();
+    buttons.Step();
+    return state;
+}
+//------------------------------------------------------------------------------
+
+Game_Start::Game_Start(int a) :
+    points(POINTS),
+    gloabal_stats(40.0f, 440.0f)
+{
+    state = 0;
+    if (a < 0)
+    {
+        Stats::Init();
+        button = new MenuButton(128.0f, 52.0f, Graphic_Resources::textures[MENU], 0.8f, 1.0f);
+        button->SetCallback([this](){state = selectBack;});
+        for (int i = 0; i < 8; i++)
+            team[i] = -1;
+    }
+    else
+    {
+        points += (int)(floor((-1.0 + sqrt(1.0 + Stats::score / 62.5)) / 2.0));
+        for (int i = 0; i < 8; i++)
+            if (team[i] != -1)
+                points -= 1 + team[i] / 3;
+    }
+
+    characters.push_back(new UnitButton(336.0f, 364.0f, unit_data[ORC].spriteset[0][6]->images[0]));
+    characters.push_back(new UnitButton(336.0f, 492.0f, unit_data[PIRATE].spriteset[0][6]->images[0]));
+    characters.push_back(new UnitButton(336.0f, 620.0f, unit_data[HUNTER].spriteset[0][6]->images[0]));
+    characters.push_back(new UnitButton(464.0f, 364.0f, unit_data[BARBARIAN].spriteset[0][6]->images[0]));
+    characters.push_back(new UnitButton(464.0f, 492.0f, unit_data[SKELWAR].spriteset[0][6]->images[0]));
+    characters.push_back(new UnitButton(464.0f, 620.0f, unit_data[SKELARCH].spriteset[0][6]->images[0]));
+    characters.push_back(new UnitButton(592.0f, 364.0f, unit_data[VIKING].spriteset[0][6]->images[0]));
+    characters.push_back(new UnitButton(592.0f, 492.0f, unit_data[LAVA].spriteset[0][6]->images[0]));
+    characters.push_back(new UnitButton(592.0f, 620.0f, unit_data[ARCHER].spriteset[0][6]->images[0]));
+    characters.push_back(new UnitButton(720.0f, 364.0f, unit_data[KNIGHT].spriteset[0][6]->images[0]));
+    characters.push_back(new UnitButton(720.0f, 492.0f, unit_data[DWARF].spriteset[0][6]->images[0]));
+
+    buttonOK = new MenuButton(944.0f, 52.0f, Graphic_Resources::textures[OKBUTTON]);
+    buttonOK->SetCallback([this](){state = selectStart;});
+
+    for (int i = 0; i < 8; i++)
+    {
+        charsTeam.push_back(new UnitButton(192+i*96, 144.0f, unit_data[ORC].spriteset[0][6]->images[0]));
+        charsTeam.back()->SetCallback([this, i](){TeamRemove(i);});
+        charsTeam.back()->Enable(false);
+    }
+    rectangleInfo = new RectangleOutline(210.0f, 230.0f, 600.0f, 30.0f);
+    rectangleInfo->SetColor(glm::vec3(0.8f, 0.8f, 0.2f));
+
+    txtLines.push_back(new TextObj(780.0f, 60.0f, ""));
+    txtLines.back()->SetColor(glm::vec3(1.0f, 1.0f, 1.0f));
+    txtLines.back()->SetScale(0.48f);
+
+    txtLines.push_back(new TextObj(240.0f, 235.0f, ""));
+    txtLines.back()->SetColor(glm::vec3(0.5f, 1.0f, 0.2f));
+    txtLines.back()->SetScale(0.40f);
+
+    txtLines.push_back(new TextObj(650.0f, 208.0f, ""));
+    txtLines.back()->SetColor(glm::vec3(0.8f, 0.8f, 0.2f));
+    txtLines.back()->SetScale(0.40f);
+
+    for (unsigned i = 0; i < characters.size(); i++)
+    {
+        characters[i]->Enable(Stats::unlocked & (0x0001 << i));
+        characters[i]->SetCallback([this, i](){TeamAdd(i);});
+    }
+    gloabal_stats.Step();
+}
 
 //------------------------------------------------------------------------------
-void Menu::Display() 
-{
- glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); 
- glLoadIdentity(); 
- glEnable( GL_TEXTURE_2D );
- 
- Draw_Texture(Graphic_Resources::textures[TITLE],326.0f,710.0f,600.0f,664.0f,0.0f);
- 
- glBindTexture( GL_TEXTURE_2D, Graphic_Resources::textures[MENU]);
- int i;
- float y1, y2;
- if (active_game == NULL) {
-    y1 = 0.2f;
-    y2 = 274.0f;
-    i = 1;  
-    }
-    else{
-         y1 = 0.0f;
-         y2 = 180.0f;
-         i = 0; 
-         }  
- glBegin (GL_QUADS);
- for (; i < 5; i++)
- {
-  if (Mouse::Position(416.0f,608.0f,y2,y2+64.0))
-  {
-   glColor3f(1.0f,1.0f,0.0f);
-   if (Mouse::Button(LEFT_UP))
-   {
-    Audio::Play(PLAY_CLICK);
-    switch (i)
-    {
-     case 0: ((Game*)active_game)->Resume_Game();break;
-     case 1: exit(0);
-     case 2: new Credits(active_game);break;
-     case 3: new How_To(active_game);break;
-     case 4: delete active_game; new Game_Start();break;                   
-     }
-    } 
-   } 
-   else glColor3f(1.0f,1.0f,1.0f); 
-    
-  glTexCoord2d(0.0f,y1);glVertex3f(416.0f,y2,0.0f);
-  glTexCoord2d(1.0f,y1);glVertex3f(608.0f,y2,0.0f);
-  y1 += 0.2f;
-  y2 += 64.0f;   
-  glTexCoord2d(1.0f,y1);glVertex3f(608.0f,y2,0.0f);
-  glTexCoord2d(0.0f,y1);glVertex3f(416.0f,y2,0.0f);
-  }
- glEnd();
- }
 
-//------------------------------------------------------------------------------ 
-Game_Start::Game_Start()
-{
- if (game)
- delete game;
- game = this;  
- Stats::Init();
- points = POINTS;
- back = true;
- characters[0] = new Orc(0,0);
- characters[1] = new Pirate(0,0);
- characters[2] = new Hunter(0,0);
- characters[3] = new Barbar(0,0); 
- characters[4] = new Skel_War(0,0);
- characters[5] = new Skel_Arch(0,0);
- characters[6] = new Viking(0,0);
- characters[7] = new Lava(0,0);
- characters[8] = new Archer(0,0);
- characters[9] = new Knight(0,0); 
- characters[10] = new Dwarf(0,0); 
- team = new int[8];
- for (int i = 0; i < 8; i++)
- team[i] = -1;
- }
- 
-//------------------------------------------------------------------------------ 
-Game_Start::Game_Start(int a)
-{
- team = Game::team;
- Game::team = NULL;                         
- if (game)
- delete game;
- game = this;
- back = false;
- characters[0] = new Orc(0,0);
- characters[1] = new Pirate(0,0);
- characters[2] = new Hunter(0,0);
- characters[3] = new Barbar(0,0); 
- characters[4] = new Skel_War(0,0);
- characters[5] = new Skel_Arch(0,0);
- characters[6] = new Viking(0,0);
- characters[7] = new Lava(0,0);
- characters[8] = new Archer(0,0);
- characters[9] = new Knight(0,0); 
- characters[10] = new Dwarf(0,0); 
- points = POINTS;
- points += (int) (floor((-1.0+sqrt(1.0+Stats::score/62.5))/2.0)); 
- for (int i = 0; i < 8; i++)
- if (team[i] != -1)
- points -= 1+team[i]/3;
- }
-
-//------------------------------------------------------------------------------ 
 Game_Start::~Game_Start()
 {
- for (int i = 0; i<11;i++)
- delete characters[i]; 
- }
+    for (unsigned i = 0; i < characters.size(); i++)
+        delete characters[i];
+
+    for (unsigned i = 0; i < charsTeam.size(); i++)
+        delete charsTeam[i];
+
+    for (const auto& i : txtLines)
+        delete i;
+    delete button;
+    delete buttonOK;
+    delete rectangleInfo;
+}
 
 //------------------------------------------------------------------------------
-void Game_Start::Display() 
-{
- glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); 
- glLoadIdentity(); 
- glEnable( GL_TEXTURE_2D );
 
- float x1 = 272;
- float y1 = 300;
- 
- for (int i =0; i<11; i++)
- {
-  if (Stats::unlocked&(0x0001<<i))
-  Draw_Texture(characters[i]->spriteset->sprites[0][6]->images[0],x1,x1+96,y1,y1+96,0);
-  y1 += 128;
-  if (i%3 ==2){
-     y1 = 300;
-     x1 += 128;       
-     }         
-  }
-   
-  x1 = 128;
-  y1 = 96;  
-  for (int i =0; i<8; i++) 
-  {
-   if (team[i] != -1)
-   Draw_Texture(characters[team[i]]->spriteset->sprites[0][6]->images[0],x1,x1+96,y1,y1+96,0); 
-   x1 += 96;      
-   }
- 
- if (back) 
- {
-  if (Mouse::Position(22,150,28,76))
-  {
-   glColor3f(1.0f,1.0f,0.0f); 
-   if (Mouse::Button(LEFT_UP)){
-      Audio::Play(PLAY_CLICK);
-      game = new Menu(NULL);
-      delete team;
-      delete this;
-      }              
-   }
-   else glColor3f(1.0f,1.0f,1.0f);
-  glBindTexture( GL_TEXTURE_2D, Graphic_Resources::textures[MENU]);  
-  glBegin (GL_QUADS);
-  glTexCoord2d(1.0,0.2);glVertex3f(150,76,0);
-  glTexCoord2d(0.0,0.2);glVertex3f(22,76,0);
-  glTexCoord2d(0.0,0.0);glVertex3f(22,28,0);
-  glTexCoord2d(1.0,0.0);glVertex3f(150,28,0);
-  glEnd();     
-  } 
- 
- if (points != POINTS)  
- {
-  if (Mouse::Position(920,968,28,70))
-  {
-   glColor3f(1.0f,1.0f,0.0f); 
-   if(Mouse::Button(LEFT_UP))
-    {
-    Audio::Play(PLAY_CLICK);                        
-    game = new Game(team);
-    delete this;
-    }             
-   }
-   else glColor3f(1.0f,1.0f,1.0f);  
-  Draw_Texture(Graphic_Resources::textures[OKBUTTON],920.0f,968.0f,28.0f,76.0f,0.0f);
-  }
-   
- glDisable( GL_TEXTURE_2D );
-  
- x1 = 256;
- y1 = 284;
- for (int i =0; i<11; i++)
- { 
-  if (Mouse::Position(x1,x1+127,y1,y1+127))
-  {
-   if (Stats::unlocked&(1<<i)) 
-      {                                         
-       Display_Info(i); 
-       if (Mouse::Button(LEFT_UP))
-          for (int j = 0; j < 8; j++)    
-          if ((team[j] == -1)&&(points >= 1+i/3))  
-             {
-              team[j] = i;
-              points -= 1+i/3;
-              Audio::Play(PLAY_CLICK);
-              break;            
-              } 
-       }else Unlock_Info(i);
-   glColor3f(0.0f,1.0f,0.0f);                   
-   }
-  else
-  glColor3f(1.0f,0.0f,0.0f);  
-  Draw_Rectangle_Outline(x1,x1+127,y1,y1+127,0);
-  y1 += 128;
-  if (i%3 ==2)
-  {
-   y1 = 284;
-   x1 += 128;       
-   }         
-  } 
- 
- x1 = 128;
- y1 = 96;
- for (int i =0; i<8; i++)
- {
-  if (Mouse::Position(x1,x1+95,y1,y1+95)){
-     glColor3f(0.0f,1.0f,0.0f); 
-     if (team[i] != -1){
-        Display_Info(team[i]);
-        if (Mouse::Button(LEFT_UP)){
-           points += 1+team[i]/3;
-           team[i] = -1;  
-           Audio::Play(PLAY_CLICK);
-           }
-        }               
-     }
-     else
-     glColor3f(1.0f,1.0f,1.0f);  
-     Draw_Rectangle_Outline(x1,x1+95,y1,y1+95,0); 
-     x1 += 96;      
-   }
-  
-  char* str = new char[20]; 
-  glColor3f(0.8f,0.8f,0.2f);  
-  glRasterPos3f(64.0f,560.0f,200.0f);
-  sprintf(str,"Score: %d",Stats::score); 
-  glutBitmapString(GLUT_BITMAP_HELVETICA_18,(const unsigned char*)str);
-  glRasterPos3f(64.0f,520.0f,200.0f);
-  sprintf(str,"Melee lv.:  %d",Stats::stats[0]); 
-  glutBitmapString(GLUT_BITMAP_9_BY_15,(const unsigned char*)str); 
-  glRasterPos3f(64.0f,500.0f,200.0f);
-  sprintf(str,"Ranged lv.: %d",Stats::stats[1]); 
-  glutBitmapString(GLUT_BITMAP_9_BY_15,(const unsigned char*)str);  
-  glColor3f(1.0f,1.0f,1.0f); 
-  glRasterPos3f(64.0f,600.0f,200.0f);
-  sprintf(str,"Battle: %d",Stats::level+1); 
-  glutBitmapString(GLUT_BITMAP_HELVETICA_18,(const unsigned char*)str);
-  glRasterPos3f(780,60,0);
-  sprintf(str,"Points: %d",points); 
-  glutBitmapString(GLUT_BITMAP_HELVETICA_18,(const unsigned char*)str);  
- }
- 
-//------------------------------------------------------------------------------ 
+int Game_Start::Update()
+{
+    txtLines[0]->SetText(std::string("Points: ") + std::to_string(points));
+    for (unsigned i = 0; i < charsTeam.size(); i++)
+        charsTeam[i]->Step();
+
+    for (unsigned i = 0; i < characters.size(); i++)
+        characters[i]->Step();
+
+    buttonOK->Enable(points != POINTS);
+    buttonOK->Step();
+    button->Step();
+
+    for (unsigned i = 0; i < characters.size(); i++)
+        if (Mouse::Position(256+i/3*128, 383+i/3*128, 284+i%3*128, 411+i%3*128))
+        {
+            Display_Info(i);
+            return state;
+        }
+
+    for (unsigned i = 0; i < charsTeam.size(); i++)
+        if (Mouse::Position(128+i*96, 223 + i*96, 96, 192))
+            if (team[i] != -1)
+            {
+                Display_Info(team[i]);
+                return state;
+            }
+
+    return state;
+}
+
+void Game_Start::TeamAdd(int id)
+{
+    if (Stats::unlocked & (1 << id))
+        for (int j = 0; j < 8; j++)
+            if ((team[j] == -1)&&(points >= 1u + id / 3u))
+            {
+                team[j] = id;
+                points -= 1 + id / 3;
+                charsTeam[j]->SetTexture(unit_data[id].spriteset[0][6]->images[0]);
+                charsTeam[j]->Enable(true);
+                Audio::Play(PLAY_CLICK);
+                return;
+            }
+}
+
+void Game_Start::TeamRemove(int ind)
+{
+    points += 1 + team[ind] / 3;
+    team[ind] = -1;
+    charsTeam[ind]->Enable(false);
+}
+
+//------------------------------------------------------------------------------
+
 void Game_Start::Display_Info(int ind)
 {
- glColor3f(0.5f,1.0f,0.2f);   
- char* str = new char[18]; 
- glRasterPos3f(240,240,0);
- sprintf(str,"HP: %d",characters[ind]->maxhp); 
- glutBitmapString(GLUT_BITMAP_9_BY_15,(const unsigned char*)str); 
- glRasterPos3f(400,240,0);
- sprintf(str,"Damage: %d - %d",characters[ind]->dmg,characters[ind]->dmg+characters[ind]->dmg2); 
- glutBitmapString(GLUT_BITMAP_9_BY_15,(const unsigned char*)str); 
- glRasterPos3f(625,240,0);
- sprintf(str,"Defense: %d / %d",characters[ind]->def,characters[ind]->def2); 
- glutBitmapString(GLUT_BITMAP_9_BY_15,(const unsigned char*)str);
- glColor3f(0.8f,0.8f,0.2f);  
- glRasterPos3f(640,214,0);
- sprintf(str,"Req. points : %d",1+ind/3); 
- glutBitmapString(GLUT_BITMAP_9_BY_15,(const unsigned char*)str);  
- Draw_Rectangle_Outline(210,800,230,260,0);
-  
- delete[] str;
- }
+    if (Stats::unlocked & (1 << ind))
+    {
+        txtLines[1]->SetText(std::string("HP: ") + std::to_string(unit_data[ind].hp));
+        txtLines[1]->AddText(std::string("Damage: ") + std::to_string(unit_data[ind].dmg_base) + " - " + std::to_string(unit_data[ind].dmg_base + unit_data[ind].dmg_var), 380.0f, 0.0f);
+        txtLines[1]->AddText(std::string("Defense: ") + std::to_string(unit_data[ind].def_melee) + " / " + std::to_string(unit_data[ind].def_ranged), 900.0f, 0.0f);
+        txtLines[2]->SetText(std::string("Req. points: ") + std::to_string(1 + ind / 3));
+    }
+    else
+    {
+        char a[] = {'3', '2', '2', '4', '3', '1', '4', '5'};
+        char b[] = {'1', '3', '2', '1', '2', '4', '3', '1'};
 
-//------------------------------------------------------------------------------ 
-void Game_Start::Unlock_Info(int ind)
-{
- int a,b;
- switch (ind)
- {
-  case 3: a = 3 ; b = 1 ; break;
-  case 4: a = 2 ; b = 3 ; break;
-  case 5: a = 2 ; b = 2 ; break;
-  case 6: a = 4 ; b = 1 ; break;
-  case 7: a = 3 ; b = 2 ; break;
-  case 8: a = 1 ; b = 4 ; break;
-  case 9: a = 4 ; b = 3 ; break;
-  case 10: a = 5 ; b = 1 ; break;
-  default: return;
-  }              
- char* str = new char[20]; 
- glColor3f(0.5f,1.0f,0.2f); 
- glRasterPos3f(240,240,0);
- glutBitmapString(GLUT_BITMAP_9_BY_15,(const unsigned char*)"LOCKED"); 
- glRasterPos3f(400,240,0);
- sprintf(str,"Req. Melee lv.: %d",a); 
- glutBitmapString(GLUT_BITMAP_9_BY_15,(const unsigned char*)str); 
- glRasterPos3f(625,240,0);
- sprintf(str,"Req. Ranged lv.: %d",b); 
- glutBitmapString(GLUT_BITMAP_9_BY_15,(const unsigned char*)str);
- glColor3f(0.8f,0.8f,0.2f);  
- Draw_Rectangle_Outline(210,800,230,260,0); 
- delete[] str;
- }
- 
-//------------------------------------------------------------------------------ 
-void Loading::Display()
-{
- glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); 
- glLoadIdentity();     
- glColor3f(0.8f,0.8f,0.2f);      
- glRasterPos3f(450,400,0);
- glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_24,(const unsigned char*)"LOADING...");      
- glutSwapBuffers();
- Graphic_Resources::Load_Graphics();
- Audio::Init();
- game = new Menu(NULL);
- delete this;      
- }
-//------------------------------------------------------------------------------ 
-Game_Over::Game_Over()
-{
- delete game;
- game = this;                     
- }
- 
-//------------------------------------------------------------------------------ 
-void Game_Over::Display()
-{
- glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); 
- glLoadIdentity();     
- glColor3f(0.8f,0.8f,0.2f);      
- glRasterPos3f(450.0f,400.0f,0.0f);
- glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_24,(const unsigned char*)"GAME OVER");      
- 
- if (Mouse::Button(ANY_UP))
- {
-  game = new Menu(NULL);
-  delete this;
-  }      
- }
+        txtLines[1]->SetText("LOCKED");
+        txtLines[1]->AddText(std::string("Req. Melee lv.: ") + a[ind-3], 380.0f, 0.0f);
+        txtLines[1]->AddText(std::string("Req. Ranged lv.: ") + b[ind-3], 900.0f, 0.0f);
+        txtLines[2]->SetText("");
+    }
+}
+//------------------------------------------------------------------------------
 
-//------------------------------------------------------------------------------ 
-void Level::Display()
+Game_Over::Game_Over() : mText(360.0f, 400.0f, "GAME OVER")
 {
- glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); 
- glLoadIdentity();     
- glColor3f(0.8f,0.8f,0.2f); 
- char* str = new char[16]; 
- sprintf(str,"Battle: %d",Stats::level);      
- glRasterPos3f(450.0f,400.0f,0.0f);
- glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_24,(const unsigned char*)str);      
- 
- if (Mouse::Button(ANY_UP))
- ((Game*)active_game)->Resume_Game();      
- }
+    mText.SetColor(glm::vec3(0.8f, 0.8f, 0.2f));
+}
+//------------------------------------------------------------------------------
 
-//------------------------------------------------------------------------------ 
-Level::Level(Controller* c)
+int Game_Over::Update()
 {
- active_game = c;                      
- }
- 
-//------------------------------------------------------------------------------
-How_To::How_To(Controller* c)
-{
- active_game = c;
- delete game;
- game = this;                          
- }
- 
-//------------------------------------------------------------------------------
-void How_To::Display()
-{
- glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); 
- glLoadIdentity(); 
- glEnable( GL_TEXTURE_2D );
- glBindTexture( GL_TEXTURE_2D, Graphic_Resources::textures[MENU]);  
- if (Mouse::Position(22,150,28,76))
- {
-  glColor3f(1.0f,1.0f,0.0f);
-  if (Mouse::Button(LEFT_UP))
-  Return();                                
-  }
-  else glColor3f(1.0f,1.0f,1.0f); 
- glBegin (GL_QUADS);
- glTexCoord2d(1.0f,0.2f);glVertex3f(150.0f,76.0f,0.0f);
- glTexCoord2d(0.0f,0.2f);glVertex3f(22.0f,76.0f,0.0f);
- glTexCoord2d(0.0f,0.0f);glVertex3f(22.0f,28.0f,0.0f);
- glTexCoord2d(1.0f,0.0f);glVertex3f(150.0f,28.0f,0.0f);
- glColor3f(1.0f,1.0f,1.0f);  
- glTexCoord2d(1.0f,0.8f);glVertex3f(622.0f,694.0f,0.0f);
- glTexCoord2d(0.0f,0.8f);glVertex3f(430.0f,694.0f,0.0f);
- glTexCoord2d(0.0f,0.6f);glVertex3f(430.0f,630.0f,0.0f);
- glTexCoord2d(1.0f,0.6f);glVertex3f(622.0f,630.0f,0.0f);
- glEnd();  
- glDisable( GL_TEXTURE_2D );
- glColor3f(0.1f,0.8f,0.8f);     
- glRasterPos3f(360.0f,550.0f,0.0f);
- glutBitmapString(GLUT_BITMAP_HELVETICA_18,(const unsigned char*)"Mouse Left Button");
- glRasterPos3f(360.0f,500.0f,0.0f);
- glutBitmapString(GLUT_BITMAP_HELVETICA_18,(const unsigned char*)"Mouse Right Button");    
- glRasterPos3f(360.0f,450.0f,0.0f);
- glutBitmapString(GLUT_BITMAP_HELVETICA_18,(const unsigned char*)"SPACE");    
- glRasterPos3f(360.0f,400.0f,0.0f);
- glutBitmapString(GLUT_BITMAP_HELVETICA_18,(const unsigned char*)"ESC");  
- glRasterPos3f(580.0f,550.0f,0.0f);
- glutBitmapString(GLUT_BITMAP_HELVETICA_18,(const unsigned char*)"Select"); 
- glRasterPos3f(580.0f,500.0f,0.0f);
- glutBitmapString(GLUT_BITMAP_HELVETICA_18,(const unsigned char*)"Move / Attack");  
- glRasterPos3f(580.0f,450.0f,0.0f);
- glutBitmapString(GLUT_BITMAP_HELVETICA_18,(const unsigned char*)"End Turn");  
- glRasterPos3f(580.0f,400.0f,0.0f);
- glutBitmapString(GLUT_BITMAP_HELVETICA_18,(const unsigned char*)"Menu");              
- } 
-
-//------------------------------------------------------------------------------
-void How_To::Return()
-{
- Audio::Play(PLAY_CLICK);
- game = new Menu(active_game);                              
- delete this; 
- } 
-//------------------------------------------------------------------------------
-void Credits::Display()
-{
- glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); 
- glLoadIdentity(); 
- glEnable( GL_TEXTURE_2D );
- glBindTexture( GL_TEXTURE_2D, Graphic_Resources::textures[MENU]);  
- if (Mouse::Position(22,150,28,76))
- {
-  glColor3f(1.0f,1.0f,0.0f);
-  if (Mouse::Button(LEFT_UP))
-  Return();                                 
-  }
-  else glColor3f(1.0f,1.0f,1.0f); 
- glBegin (GL_QUADS);
- glTexCoord2d(1.0f,0.2f);glVertex3f(150.0f,76.0f,0.0f);
- glTexCoord2d(0.0f,0.2f);glVertex3f(22.0f,76.0f,0.0f);
- glTexCoord2d(0.0f,0.0f);glVertex3f(22.0f,28.0f,0.0f);
- glTexCoord2d(1.0f,0.0f);glVertex3f(150.0f,28.0f,0.0f);
- glColor3f(1.0f,1.0f,1.0f);  
- glTexCoord2d(1.0f,0.6f);glVertex3f(622.0f,694.0f,0.0f);
- glTexCoord2d(0.0f,0.6f);glVertex3f(430.0f,694.0f,0.0f);
- glTexCoord2d(0.0f,0.4f);glVertex3f(430.0f,630.0f,0.0f);
- glTexCoord2d(1.0f,0.4f);glVertex3f(622.0f,630.0f,0.0f);
- glEnd();                
- } 
+    if (Mouse::Button(Mouse::ANY_UP))
+        return gameOver;
+    return 0;
+}
 
 //------------------------------------------------------------------------------
 
+int Level::Update()
+{
+    if (Mouse::Button(Mouse::ANY_UP))
+        return battleStart;
+    return 0;
+}
 
+//------------------------------------------------------------------------------
+
+Level::Level() : mText(450.0f, 400.0f, "")
+{
+    mText.SetText(std::string("Battle: ") + std::to_string(Stats::level));
+    mText.SetColor(glm::vec3(0.8f, 0.8f, 0.2f));
+}
+
+//------------------------------------------------------------------------------
+
+MenuButton::MenuButton(float xx, float yy, unsigned tex, float coordy0, float coordy1) :
+    Picture(xx, yy, 0.0f, tex, 0.0f, 1.0f, coordy0, coordy1),
+    x(xx),
+    y(yy){}
+
+//------------------------------------------------------------------------------
+void MenuButton::SetCallback(CallbackFunction f)
+{
+    callback = f;
+}
+
+void MenuButton::Enable(bool en)
+{
+    Picture::Enable(en);
+}
+
+int MenuButton::Step(float deltaTime)
+{
+    if (!enabled)
+        return 0;
+    if (Mouse::Position(x-width/2, x + width/2, y-height/2, y + height/2))
+    {
+        if (Mouse::Button(Mouse::LEFT_UP))
+        {
+            Audio::Play(PLAY_CLICK);
+            if (callback)
+                callback();
+            return 1;
+        }
+        SetColor(glm::vec3(1.0f, 1.0f, 0.0f));
+        return 0;
+    }
+    SetColor(glm::vec3(1.0f, 1.0f, 1.0f));
+    return 0;
+}
+
+GlobalStatsDisplay::GlobalStatsDisplay(float x, float y) :
+        border(x, y, 184.0f, 160.0f),
+        outline_melee(x+10.0f, y+54.0f, 120.0f, 10.0f),
+        outline_ranged(x+10.0f, y+18.0f, 120.0f, 10.0f),
+        rect_melee(x+10.0f, y+54.0f, 120.0f, 10.0f),
+        rect_ranged(x+10.0f, y+18.0f, 120.0f, 10.0f),
+        txt_melee(x+10.0f, y+68.0f, "Melee"),
+        txt_ranged(x+10.0f, y+33.0f, "Ranged"),
+        txt_melee_lvl(x+135.0f, y+50.0f, ""),
+        txt_ranged_lvl(x+135.0f, y+15.0f, ""),
+        txt_level(x+50.0f, y+134.0f, ""),
+        txt_score(x+20.0f, y+108.0f, ""),
+        txt_combo(x+60.0f, y+93.0f, "")
+    {
+        txt_melee.SetColor(glm::vec3(0.8f,0.25f,0.2f));
+        txt_melee.SetScale(0.32f);
+        txt_ranged.SetColor(glm::vec3(0.2f,0.8f,0.15f));
+        txt_ranged.SetScale(0.32f);
+        rect_melee.SetColor(glm::vec3(0.8f,0.25f,0.2f));
+        rect_ranged.SetColor(glm::vec3(0.2f,0.8f,0.15f));
+        txt_melee_lvl.SetColor(glm::vec3(0.8f,0.25f,0.2f));
+        txt_melee_lvl.SetScale(0.32f);
+        txt_ranged_lvl.SetColor(glm::vec3(0.2f,0.8f,0.15f));
+        txt_ranged_lvl.SetScale(0.32f);
+        txt_level.SetColor(glm::vec3(0.2f,0.8f,0.8f));
+        txt_level.SetScale(0.48f);
+        txt_score.SetColor(glm::vec3(0.8f,0.8f,0.2f));
+        txt_score.SetScale(0.48f);
+        txt_combo.SetColor(glm::vec3(0.8f,0.8f,0.2f));
+        txt_combo.SetScale(0.32f);
+    }
+
+int GlobalStatsDisplay::Step(float delta_time)
+{
+    rect_melee.SetScale((float)Stats::xp[0]/Stats::xp2[0], 1.0f);
+    rect_ranged.SetScale((float)Stats::xp[1]/Stats::xp2[1], 1.0f);
+    txt_melee_lvl.SetText(std::string("Lvl: ")+std::to_string(Stats::stats[0]));
+    txt_ranged_lvl.SetText(std::string("Lvl: ")+std::to_string(Stats::stats[1]));
+    txt_level.SetText(std::string("Battle: ")+std::to_string(Stats::level));
+    txt_score.SetText(std::string("Score: ")+std::to_string(Stats::score));
+    txt_combo.SetText(std::string("x")+std::to_string(Stats::multi));
+    return 0;
+}
+
+void GlobalStatsDisplay::Enable(bool en)
+{
+
+}

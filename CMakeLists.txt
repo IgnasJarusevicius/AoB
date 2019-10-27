@@ -14,7 +14,6 @@ endif()
 #C++11 is a required language feature for this project
 set(CMAKE_CXX_STANDARD 11)
 
-
 if(CMAKE_COMPILER_IS_GNUCXX)
 
     #enable C++11 on older versions of cmake
@@ -43,47 +42,45 @@ endif(MSVC)
 
 set(GAME_SOURCES
     ai.cpp
+    glad/glad.cpp
     audio.cpp
     controller.cpp
-    game.cpp
+    object/GameObject.cpp
+    Battle.cpp
     main.cpp
     mouse.cpp
+    graphic/texture.cpp
+    graphic/GraphicObject.cpp
     stats.cpp
+    graphic/TextObj.cpp
+    graphic/Picture.cpp
+    graphic/Rectangle.cpp
     object/bobject.cpp
     object/character.cpp
     object/damage.cpp
     object/list.cpp
     object/object.cpp
     object/ranged.cpp
-    graphic/graphics.cpp
     graphic/gres.cpp
     graphic/sprite.cpp
 )
 
 
-find_package(GLUT REQUIRED)
 find_package(OpenGL REQUIRED)
-find_package(GLEW REQUIRED)
 find_package(OpenAL REQUIRED)
 add_executable(game ${GAME_SOURCES})
 
 set(GAME_INCLUDES
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${GLUT_INCLUDE_DIR}
-	${OPENAL_INCLUDE_DIR}
-    ${GLEW_INCLUDE_DIRS}S}
+    ${CMAKE_CURRENT_SOURCE_DIR}/graphic
+    ${CMAKE_CURRENT_SOURCE_DIR}/object
+    ${OPENAL_INCLUDE_DIR}
 )
 
 target_include_directories(game PUBLIC ${GAME_INCLUDES})
 target_link_libraries(game
-                     ${GLUT_LIBRARY}
                      ${OPENGL_LIBRARIES}
-                     ${GLEW_LIBRARIES}
-                     openal)
-
-
-
-
-
-
-
+                     openal
+                     glfw
+                     dl
+                     pthread)
